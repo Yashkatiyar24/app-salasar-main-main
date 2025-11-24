@@ -9,6 +9,7 @@ import {
   off,
   DataSnapshot,
 } from 'firebase/database';
+import { TOTAL_ROOMS } from './roomConstants';
 
 export type RtdbRoom = {
   key: string;
@@ -129,11 +130,105 @@ export const fetchCustomers = async (): Promise<
 };
 
 export const computeRoomStats = (rooms: RtdbRoom[]) => {
-  const totalRooms = rooms.length;
+  // Always report against the fixed inventory size (45), even if RTDB has fewer entries.
+  const totalRooms = TOTAL_ROOMS;
   const occupiedRooms = rooms.filter((r) => !r.is_available).length;
-  const availableRooms = totalRooms - occupiedRooms;
+  const availableRooms = Math.max(totalRooms - occupiedRooms, 0);
   const occupiedRoomNos = rooms.filter((r) => !r.is_available).map((r) => r.room_no);
   return { totalRooms, occupiedRooms, availableRooms, occupiedRoomNos };
+};
+
+export type BookingDetail = {
+  id: string;
+  customerId: string;
+  roomNo: string;
+  status: string;
+  checkInDate: string;
+  checkOutDate: string;
+  checkOutActual?: string;
+  createdAt?: number;
+  roomKey?: string;
+  customer?: {
+    name: string;
+    mobile: string;
+    father_name?: string;
+    address?: string;
+    city?: string;
+  };
+  room?: RtdbRoom;
+};
+
+export const fetchBookingById = async (bookingId: string): Promise<BookingDetail | null> => {
+  const bookingRef = ref(rtdb, `bookings/${bookingId}`);
+  const [bookingSnap, customersSnap, roomsSnap] = await Promise.all([
+    get(bookingRef),
+    get(ref(rtdb, 'customers')),
+    get(ref(rtdb, 'rooms')),
+  ]);
+  if (!bookingSnap.exists()) return null;
+  const bookingVal = bookingSnap.val() as any;
+  const customersVal = customersSnap.val() || {};
+  const roomsVal = roomsSnap.val() || {};
+
+  const roomEntry = Object.entries(roomsVal).find(
+    ([, value]: any) => value.room_no?.toString() === bookingVal.roomNo?.toString()
+  );
+  const roomKey = roomEntry ? roomEntry[0] : undefined;
+  const room = roomEntry
+    ? mapRoomsSnapshot({ val: () => ({ [roomEntry[0]]: roomEntry[1] }) } as any)[0]
+    : undefined;
+
+  const customer = customersVal[bookingVal.customerId];
+
+  return {
+    id: bookingId,
+    customerId: bookingVal.customerId,
+    roomNo: bookingVal.roomNo,
+    status: bookingVal.status,
+    checkInDate: bookingVal.checkInDate,
+    checkOutDate: bookingVal.checkOutDate,
+    checkOutActual: bookingVal.checkOutActual,
+    createdAt: bookingVal.createdAt,
+    roomKey,
+    room,
+    customer: customer
+      ? {
+          name: customer.guestName || customer.name || 'Guest',
+          mobile: customer.mobileNumber || customer.phone || '',
+          father_name: customer.fatherName || customer.father_name || '',
+          address: customer.address || '',
+          city: customer.city || '',
+        }
+      : undefined,
+  };
+};
+
+export const checkoutBooking = async (bookingId: string) => {
+  const bookingSnap = await get(ref(rtdb, `bookings/${bookingId}`));
+  if (!bookingSnap.exists()) throw new Error('Booking not found');
+  const bookingVal = bookingSnap.val() as any;
+
+  const roomsSnap = await get(ref(rtdb, 'rooms'));
+  const roomsVal = roomsSnap.val() || {};
+  const roomEntry = Object.entries(roomsVal).find(
+    ([, value]: any) => value.room_no?.toString() === bookingVal.roomNo?.toString()
+  );
+  const roomKey = roomEntry ? roomEntry[0] : null;
+
+  const nowIso = new Date().toISOString();
+
+  await update(ref(rtdb, `bookings/${bookingId}`), {
+    status: 'checked_out',
+    checkOutActual: nowIso,
+    updatedAt: Date.now(),
+  });
+
+  if (roomKey) {
+    await update(ref(rtdb, `rooms/${roomKey}`), {
+      is_available: true,
+      current_booking_id: null,
+    });
+  }
 };
 
 export const fetchAvailableRooms = async (): Promise<RtdbRoom[]> => {

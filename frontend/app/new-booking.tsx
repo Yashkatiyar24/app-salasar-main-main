@@ -27,8 +27,8 @@ import { TOTAL_ROOMS } from '../src/utils/roomConstants';
 const NewBookingScreen: React.FC = () => {
   const router = useRouter();
 
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formatDate = (date: Date | null) =>
+    date ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 
   // Guest Details
   const [guestName, setGuestName] = useState('');
@@ -43,9 +43,11 @@ const NewBookingScreen: React.FC = () => {
   const [idNumber, setIdNumber] = useState('');
   const [idImageUrl, setIdImageUrl] = useState('');
 
-  // Booking Details
-  const [checkInDate, setCheckInDate] = useState(() => new Date());
-  const [checkOutDate, setCheckOutDate] = useState(() => new Date(Date.now() + 86400000));
+  // Booking Details: Date | null state (default to today / tomorrow for better UX)
+  const [checkInDate, setCheckInDate] = useState<Date | null>(new Date());
+  const [checkOutDate, setCheckOutDate] = useState<Date | null>(
+    new Date(Date.now() + 24 * 60 * 60 * 1000)
+  );
   const [showCheckInPicker, setShowCheckInPicker] = useState(false);
   const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<RtdbRoom | null>(null);
@@ -85,8 +87,8 @@ const NewBookingScreen: React.FC = () => {
     setCity('');
     setIdNumber('');
     setIdImageUrl('');
-    setCheckInDate(new Date());
-    setCheckOutDate(new Date(Date.now() + 86400000));
+    setCheckInDate(null);
+    setCheckOutDate(null);
     setSelectedRoom(null);
   };
 
@@ -133,6 +135,19 @@ const NewBookingScreen: React.FC = () => {
     loadRooms();
   }, []);
 
+  // Helpers & web input refs for web date popup support
+  const checkInInputRef = React.useRef<any>(null);
+  const checkOutInputRef = React.useRef<any>(null);
+
+  const toDateInputValue = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const openWebDateInput = (ref: React.RefObject<any>) => {
+    if (ref && ref.current && typeof ref.current.click === 'function') ref.current.click();
+  };
+
   const validateForm = () => {
     if (!guestName.trim()) {
       Alert.alert('Missing Info', 'Guest name is required');
@@ -159,19 +174,23 @@ const NewBookingScreen: React.FC = () => {
       return false;
     }
 
-    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
-      Alert.alert('Missing Info', 'Please enter valid check-in and check-out dates');
+    // Dates must be selected
+    if (!checkInDate || !checkOutDate) {
+      Alert.alert('Missing Info', 'Please select both check-in and check-out dates');
       return false;
     }
-    if (checkOutDate <= checkInDate) {
-      Alert.alert('Invalid Dates', 'Check-out must be after check-in');
+
+    // Check-out must not be earlier than check-in (equal allowed)
+    if (checkOutDate < checkInDate) {
+      Alert.alert('Invalid Dates', 'Check-out must be the same or after check-in');
       return false;
     }
+
     return true;
   };
 
   const handleCreateBooking = async () => {
-    if (!validateForm() || !selectedRoom) return;
+    if (!validateForm() || !selectedRoom || !checkInDate || !checkOutDate) return;
 
     const members = Number.parseInt(membersCount, 10) || 0;
 
@@ -220,6 +239,71 @@ const NewBookingScreen: React.FC = () => {
   if (loadingRooms && rooms.length === 0) {
     return <LoadingSpinner message="Loading available rooms..." />;
   }
+
+  // Handlers for pickers:
+  const onCheckInChange = (_event: any, date?: Date | undefined) => {
+    setShowCheckInPicker(false);
+    if (!date) return; // user dismissed
+    // If checkOut exists and is before the new check-in, set check-out to next day and notify
+    if (checkOutDate && date > checkOutDate) {
+      setCheckInDate(date);
+      setCheckOutDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
+      Alert.alert(
+        'Date Updated',
+        'Check-in date was set after the previously chosen check-out date. Check-out was moved to the next day.'
+      );
+    } else {
+      setCheckInDate(date);
+      // if no checkout chosen yet, default to next day
+      if (!checkOutDate) setCheckOutDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
+    }
+  };
+
+  const onCheckOutChange = (_event: any, date?: Date | undefined) => {
+    setShowCheckOutPicker(false);
+    if (!date) return; // user dismissed
+    // If no check-in selected, require check-in first
+    if (!checkInDate) {
+      Alert.alert('Pick check-in first', 'Please select a check-in date before selecting check-out.');
+      return;
+    }
+    // Reject if check-out is earlier than check-in
+    if (date < checkInDate) {
+      Alert.alert('Invalid Date', 'Check-out must not be earlier than the selected check-in date.');
+      return;
+    }
+    setCheckOutDate(date);
+  };
+
+  // Web handlers for hidden date inputs
+  const onWebCheckInChange = (e: any) => {
+    const v = e.target.value; // YYYY-MM-DD
+    if (!v) return;
+    const d = new Date(v + 'T00:00:00');
+    if (checkOutDate && d > checkOutDate) {
+      setCheckInDate(d);
+      setCheckOutDate(new Date(d.getTime() + 24 * 60 * 60 * 1000));
+      window.alert('Selected check-in is after current check-out. Check-out moved to next day.');
+    } else {
+      setCheckInDate(d);
+      if (!checkOutDate) setCheckOutDate(new Date(d.getTime() + 24 * 60 * 60 * 1000));
+    }
+  };
+
+  const onWebCheckOutChange = (e: any) => {
+    const v = e.target.value;
+    if (!v) return;
+    const d = new Date(v + 'T00:00:00');
+    if (!checkInDate) {
+      window.alert('Please choose a check-in date first.');
+      return;
+    }
+    if (d < checkInDate) {
+      window.alert('Check-out cannot be earlier than check-in.');
+      return;
+    }
+    setCheckOutDate(d);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -291,12 +375,51 @@ const NewBookingScreen: React.FC = () => {
         />
 
         <Text style={styles.sectionTitle}>Booking Details</Text>
-        <TouchableOpacity style={styles.input} onPress={() => setShowCheckInPicker(true)}>
+
+        {/* Tapping the field opens the date picker */}
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => {
+            // if no check-in date chosen yet, default to today in picker
+            setShowCheckInPicker(true);
+          }}
+        >
           <Text style={styles.inputText}>
             {checkInDate ? formatDate(checkInDate) : 'Select check-in date *'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.input} onPress={() => setShowCheckOutPicker(true)}>
+
+        {/* Hidden web inputs (only used on web) - keep them near the visible fields */}
+        {Platform.OS === 'web' && (
+          <>
+            <input
+              ref={(el) => {
+                checkInInputRef.current = el;
+              }}
+              type="date"
+              style={{ display: 'none' }}
+              value={checkInDate ? toDateInputValue(checkInDate) : ''}
+              onChange={onWebCheckInChange}
+            />
+            <input
+              ref={(el) => {
+                checkOutInputRef.current = el;
+              }}
+              type="date"
+              style={{ display: 'none' }}
+              value={checkOutDate ? toDateInputValue(checkOutDate) : ''}
+              onChange={onWebCheckOutChange}
+            />
+          </>
+        )}
+
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => {
+            // require check-in to be selected first for better UX, but we still allow opening picker:
+            setShowCheckOutPicker(true);
+          }}
+        >
           <Text style={styles.inputText}>
             {checkOutDate ? formatDate(checkOutDate) : 'Select check-out date *'}
           </Text>
@@ -332,26 +455,27 @@ const NewBookingScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Date pickers — use fallback value when state is null */}
         {showCheckInPicker && (
           <DateTimePicker
-            value={checkInDate}
+            testID="dateTimePickerCheckIn"
+            value={checkInDate ?? new Date()}
             mode="date"
             display="default"
-            onChange={(_, date) => {
-              setShowCheckInPicker(false);
-              if (date) setCheckInDate(date);
-            }}
+            onChange={onCheckInChange}
+            maximumDate={new Date(2100, 11, 31)}
+            minimumDate={new Date(1900, 0, 1)}
           />
         )}
         {showCheckOutPicker && (
           <DateTimePicker
-            value={checkOutDate}
+            testID="dateTimePickerCheckOut"
+            value={checkOutDate ?? (checkInDate ?? new Date())}
             mode="date"
             display="default"
-            onChange={(_, date) => {
-              setShowCheckOutPicker(false);
-              if (date) setCheckOutDate(date);
-            }}
+            onChange={onCheckOutChange}
+            maximumDate={new Date(2100, 11, 31)}
+            minimumDate={checkInDate ?? new Date(1900, 0, 1)}
           />
         )}
 

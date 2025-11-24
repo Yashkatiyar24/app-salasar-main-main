@@ -29,7 +29,8 @@ const DashboardScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const fallback = () => {
-        const total = Math.min(defaultRoomSeeds.length, TOTAL_ROOMS);
+        // Use the authoritative TOTAL_ROOMS count even when RTDB isn't available.
+        const total = TOTAL_ROOMS;
         setStats({
           totalRooms: total,
           availableRooms: total,
