@@ -15,6 +15,7 @@ import BookingItem from '../../src/components/BookingItem';
 import LoadingSpinner from '../../src/components/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { normalizeBookingStatus } from '../../src/utils/rtdbService';
 
 const BookingsScreen = () => {
   const router = useRouter();
@@ -43,14 +44,16 @@ const BookingsScreen = () => {
           (key) => roomsVal[key].room_no?.toString() === booking.roomNo?.toString()
         );
         const roomData = roomKey ? roomsVal[roomKey] : null;
+        const normalizedStatus = normalizeBookingStatus(booking.status);
+        const roomAvailable = roomData?.is_available !== false && !roomData?.current_booking_id;
 
         return {
           id,
           customer_id: booking.customerId || '',
           room_id: roomKey || booking.roomNo || '',
           check_in: booking.checkInDate,
-          check_out_expected: booking.checkOutDate,
-          status: booking.status === 'active' ? 'CONFIRMED' : 'CHECKED_OUT',
+          check_out_expected: booking.checkOutDate || booking.checkoutDate,
+          status: normalizedStatus,
           total_amount: 0,
           created_by: '',
           created_at: booking.createdAt ? new Date(booking.createdAt).toISOString() : '',
@@ -77,7 +80,7 @@ const BookingsScreen = () => {
                 type: roomData.type || 'Room',
                 capacity: roomData.beds || 1,
                 price_per_night: 0,
-                status: roomData.is_available ? 'AVAILABLE' : 'OCCUPIED',
+                status: roomAvailable ? 'AVAILABLE' : 'OCCUPIED',
                 current_booking_id: roomData.current_booking_id,
               }
             : undefined,

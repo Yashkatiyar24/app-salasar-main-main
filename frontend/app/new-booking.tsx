@@ -17,8 +17,7 @@ import LoadingSpinner from '../src/components/LoadingSpinner';
 import {
   createBooking,
   createCustomer,
-  fetchAllRooms,
-  markRoomOccupied,
+  subscribeAvailableRooms,
   RtdbRoom,
 } from '../src/utils/rtdbService';
 import { defaultRoomSeeds } from '../src/utils/defaultRooms';
@@ -92,47 +91,38 @@ const NewBookingScreen: React.FC = () => {
     setSelectedRoom(null);
   };
 
-  const loadRooms = async () => {
-    setLoadingRooms(true);
-    try {
-      const allRooms = await fetchAllRooms();
-      const available = allRooms.filter((r) => r.is_available);
-      const sorted = available.sort((a, b) => a.room_no - b.room_no);
-
-      // If RTDB returns no rooms or no available rooms, fallback to local seeds so UI isn't empty.
-      const finalList =
-        sorted.length > 0
-          ? sorted
-          : fallbackRooms.filter((r) => r.is_available).sort((a, b) => a.room_no - b.room_no);
-
-      setRooms(finalList);
-
-      // Auto-select the first available room
-      if (!selectedRoom && finalList.length > 0) {
-        setSelectedRoom(finalList[0]);
-      }
-    } catch (error) {
-      console.error('Error fetching available rooms:', error);
-      const availableFallback = fallbackRooms.filter((r) => r.is_available);
-      setRooms(availableFallback);
-      if (!selectedRoom && availableFallback.length > 0) {
-        setSelectedRoom(availableFallback[0]);
-      }
-      if (!roomsErrorShown) {
-        const message =
-          error && (error as any).code === 'PERMISSION_DENIED'
-            ? 'Permission denied while reading rooms. Check your Realtime Database rules or credentials.'
-            : 'Unable to load live room availability. Showing default list instead.';
-        Alert.alert('Offline mode', message);
-        setRoomsErrorShown(true);
-      }
-    } finally {
-      setLoadingRooms(false);
-    }
-  };
-
   useEffect(() => {
-    loadRooms();
+    setLoadingRooms(true);
+    const unsubscribe = subscribeAvailableRooms(
+      (liveRooms) => {
+        const usable = liveRooms.length
+          ? liveRooms
+          : fallbackRooms.filter((r) => r.is_available).sort((a, b) => a.room_no - b.room_no);
+        setRooms(usable);
+        setSelectedRoom((current) => {
+          if (current && usable.find((r) => r.key === current.key)) return current;
+          return usable[0] ?? null;
+        });
+        setLoadingRooms(false);
+      },
+      (error) => {
+        console.error('Error subscribing to rooms:', error);
+        const availableFallback = fallbackRooms.filter((r) => r.is_available);
+        setRooms(availableFallback);
+        setSelectedRoom((current) => current ?? availableFallback[0] ?? null);
+        if (!roomsErrorShown) {
+          const message =
+            error && (error as any).code === 'PERMISSION_DENIED'
+              ? 'Permission denied while reading rooms. Check your Realtime Database rules or credentials.'
+              : 'Unable to load live room availability. Showing default list instead.';
+          Alert.alert('Offline mode', message);
+          setRoomsErrorShown(true);
+        }
+        setLoadingRooms(false);
+      }
+    );
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helpers & web input refs for web date popup support
@@ -211,6 +201,7 @@ const NewBookingScreen: React.FC = () => {
         selectedRoom: selectedRoom.room_no.toString(),
       });
 
+
       const bookingId = await createBooking(
         customerId,
         selectedRoom.room_no.toString(),
@@ -218,15 +209,8 @@ const NewBookingScreen: React.FC = () => {
         checkOutDate.toISOString()
       );
 
-      try {
-        await markRoomOccupied(selectedRoom.key, bookingId);
-      } catch (roomErr) {
-        console.error('Booking saved but failed to mark room occupied:', roomErr);
-      }
-
       Alert.alert('Success', 'Booking created and saved successfully');
       resetForm();
-      loadRooms();
       router.push('/bookings' as any);
     } catch (error: any) {
       console.error('Error creating booking:', error);

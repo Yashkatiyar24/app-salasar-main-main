@@ -8,10 +8,13 @@ interface StatusBadgeProps {
 }
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, small = false }) => {
+  const normalized = typeof status === 'string' ? status.toUpperCase() : status;
+
   const getStatusColor = () => {
-    switch (status) {
+    switch (normalized) {
       case 'AVAILABLE':
       case 'CONFIRMED':
+      case 'BOOKED':
       case 'CHECKED_OUT':
         return '#10b981'; // green
       case 'PENDING':
@@ -29,7 +32,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, small = false }) => {
 
   return (
     <View style={[styles.badge, { backgroundColor: getStatusColor() }, small && styles.badgeSmall]}>
-      <Text style={[styles.text, small && styles.textSmall]}>{status}</Text>
+      <Text style={[styles.text, small && styles.textSmall]}>{normalized}</Text>
     </View>
   );
 };

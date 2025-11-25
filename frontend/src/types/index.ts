@@ -36,7 +36,17 @@ export interface Customer {
   created_at: string;
 }
 
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
+export type BookingStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'BOOKED'
+  | 'CHECKED_IN'
+  | 'CHECKED_OUT'
+  | 'CANCELLED'
+  // tolerate legacy/lowercase values from RTDB
+  | 'checked_out'
+  | 'checkedout'
+  | 'booked';
 
 export interface Booking {
   id: string;

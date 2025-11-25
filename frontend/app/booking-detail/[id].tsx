@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import LoadingSpinner from '../../src/components/LoadingSpinner';
-import { fetchBookingById, checkoutBooking, BookingDetail } from '../../src/utils/rtdbService';
+import { fetchBookingById, handleCheckout as rtdbHandleCheckout, BookingDetail } from '../../src/utils/rtdbService';
 
 const BookingDetailScreen = () => {
   const router = useRouter();
@@ -33,9 +33,10 @@ const BookingDetailScreen = () => {
     if (!id) return;
     setCheckingOut(true);
     try {
-      await checkoutBooking(id);
+      await rtdbHandleCheckout(id);
       Alert.alert('Checked out', 'Booking checked out and room is now available.');
-      router.back();
+      // Navigate back to dashboard to refresh visible stats and occupied list
+      router.push('/' as any);
     } catch (error: any) {
       console.error('Checkout error', error);
       Alert.alert('Error', error?.message || 'Failed to check out');
@@ -48,7 +49,7 @@ const BookingDetailScreen = () => {
     return <LoadingSpinner message="Loading booking..." />;
   }
 
-  const isActive = booking.status === 'active';
+  const isActive = booking.status === 'BOOKED';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -67,7 +68,7 @@ const BookingDetailScreen = () => {
         <InfoRow label="Type" value={booking.room?.type || '-'} />
         <InfoRow
           label="Status"
-          value={isActive ? 'Active / Occupied' : 'Checked Out'}
+          value={isActive ? 'Booked / Occupied' : 'Checked Out'}
           valueStyle={{ color: isActive ? '#dc2626' : '#10b981' }}
         />
       </View>
