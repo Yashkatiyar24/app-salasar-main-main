@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import LoadingSpinner from '../../src/components/LoadingSpinner';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchAllRooms, RtdbRoom } from '../../src/utils/rtdbService';
+import { fetchAllRooms, subscribeToRooms, RtdbRoom } from '../../src/utils/rtdbService';
 import { TOTAL_ROOMS } from '../../src/utils/roomConstants';
 import { defaultRoomSeeds } from '../../src/utils/defaultRooms';
 
@@ -42,24 +42,40 @@ const RoomsScreen = () => {
     type: room.type,
     capacity: room.beds,
     price_per_night: 0,
-    status: room.is_available ? 'AVAILABLE' : 'OCCUPIED',
+    status: room.is_available !== false && !room.current_booking_id ? 'AVAILABLE' : 'OCCUPIED',
     ac_make: room.ac_make,
     remarks: room.remarks,
     current_booking_id: room.current_booking_id ?? undefined,
   });
 
+  const mergeWithSeeds = (live: RtdbRoom[]): RtdbRoom[] => {
+    const seedMap = new Map<number, RtdbRoom>();
+    defaultRoomSeeds.slice(0, TOTAL_ROOMS).forEach((seed) => {
+      const roomNo = Number(seed.room_number);
+      seedMap.set(
+        roomNo,
+        mapSeedToRtdbRoom(seed, seed.room_number)
+      );
+    });
+
+    live.forEach((room) => {
+      seedMap.set(room.room_no, {
+        ...room,
+        is_available: room.is_available !== false,
+      });
+    });
+
+    return Array.from(seedMap.values()).sort((a, b) => a.room_no - b.room_no);
+  };
+
   const fetchRooms = async () => {
     try {
       const fetched = await fetchAllRooms();
-      const sorted = fetched.sort((a, b) => a.room_no - b.room_no);
-      setRooms(sorted);
+      const merged = mergeWithSeeds(fetched);
+      setRooms(merged);
     } catch (error) {
       console.error('Error fetching rooms:', error);
-      const mapped = defaultRoomSeeds
-        .slice(0, TOTAL_ROOMS)
-        .map((seed) => mapSeedToRtdbRoom(seed, seed.room_number))
-        .sort((a, b) => a.room_no - b.room_no);
-      setRooms(mapped);
+      setRooms(mergeWithSeeds([]));
       alert('Offline or permission denied. Showing local room list (not synced).');
     } finally {
       setLoading(false);
@@ -72,6 +88,21 @@ const RoomsScreen = () => {
       fetchRooms();
     }, [])
   );
+
+  useEffect(() => {
+    const unsubscribe = subscribeToRooms(
+      (liveRooms) => {
+        const merged = mergeWithSeeds(liveRooms);
+        setRooms(merged);
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (error) => {
+        console.error('Room subscription error', error);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

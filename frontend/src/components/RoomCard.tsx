@@ -18,7 +18,6 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onPress }) => {
       <View style={styles.details}>
         <Text style={styles.type}>{room.type}</Text>
         <Text style={styles.info}>Capacity: {room.capacity}</Text>
-        <Text style={styles.price}>₹{room.price_per_night}/night</Text>
       </View>
     </TouchableOpacity>
   );
