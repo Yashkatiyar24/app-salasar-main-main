@@ -227,6 +227,12 @@ export const fetchCustomers = async (): Promise<
     father_name?: string;
     address?: string;
     city?: string;
+    id_number?: string;
+    id_type?: string;
+    membersCount?: number;
+    vehicleNumber?: string;
+    createdAt?: number;
+    checkInDate?: string;
   }>
 > => {
   const customersRef = ref(rtdb, 'customers');
@@ -242,8 +248,102 @@ export const fetchCustomers = async (): Promise<
       address: c.address || '',
       city: c.city || '',
       mobile: c.mobileNumber || c.phone || '',
+      id_number: c.idNumber || c.id_number || '',
+      id_type: c.idType || c.id_type || 'Aadhaar',
+      membersCount: c.membersCount || c.member_count || 1,
+      vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
+      createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
+      checkInDate: c.checkInDate,
     };
   });
+};
+
+export const fetchCustomerById = async (
+  id: string
+): Promise<{
+  id: string;
+  name: string;
+  father_name?: string;
+  address?: string;
+  city?: string;
+  mobile: string;
+  id_number?: string;
+  id_type?: string;
+  membersCount?: number;
+  vehicleNumber?: string;
+  createdAt?: number;
+  checkInDate?: string;
+} | null> => {
+  const snap = await get(ref(rtdb, `customers/${id}`));
+  if (!snap.exists()) return null;
+  const c = snap.val() as any;
+  return {
+    id,
+    name: c.guestName || c.name || 'Guest',
+    father_name: c.fatherName || c.father_name || '',
+    address: c.address || '',
+    city: c.city || '',
+    mobile: c.mobileNumber || c.phone || '',
+    id_number: c.idNumber || c.id_number || '',
+    id_type: c.idType || c.id_type || 'Aadhaar',
+    membersCount: c.membersCount || c.member_count || 1,
+    vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
+    createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
+    checkInDate: c.checkInDate,
+  };
+};
+
+export const subscribeToCustomers = (
+  callback: (
+    customers: Array<{
+      id: string;
+      name: string;
+      mobile: string;
+      father_name?: string;
+      address?: string;
+      city?: string;
+      id_number?: string;
+      id_type?: string;
+      membersCount?: number;
+      vehicleNumber?: string;
+      createdAt?: number;
+      checkInDate?: string;
+    }>
+  ) => void,
+  onError?: (error: unknown) => void
+) => {
+  const customersRef = ref(rtdb, 'customers');
+  const handler = (snap: DataSnapshot) => {
+    if (!snap.exists()) {
+      callback([]);
+      return;
+    }
+    const val = snap.val() || {};
+    const mapped = Object.entries(val).map(([key, value]) => {
+      const c = value as any;
+      return {
+        id: key,
+        name: c.guestName || c.name || 'Guest',
+        father_name: c.fatherName || c.father_name || '',
+        address: c.address || '',
+        city: c.city || '',
+        mobile: c.mobileNumber || c.phone || '',
+        id_number: c.idNumber || c.id_number || '',
+        id_type: c.idType || c.id_type || 'Aadhaar',
+        membersCount: c.membersCount || c.member_count || 1,
+        vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
+        createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
+        checkInDate: c.checkInDate,
+      };
+    });
+    callback(mapped);
+  };
+  const errorHandler = (error: unknown) => {
+    console.error('RTDB customers subscription error', error);
+    if (onError) onError(error);
+  };
+  onValue(customersRef, handler, errorHandler);
+  return () => off(customersRef, 'value', handler);
 };
 
 const roomIsAvailable = (room: RtdbRoom) =>
