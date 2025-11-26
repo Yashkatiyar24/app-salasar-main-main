@@ -35,6 +35,7 @@ export type RtdbCustomerInput = {
   city?: string;
   idNumber: string;
   idImageUrl?: string | null;
+  idImageUrls?: string[];
   checkInDate: string;
   checkOutDate: string;
   selectedRoom: string | number;
@@ -44,6 +45,7 @@ export const createCustomer = async (data: RtdbCustomerInput): Promise<string> =
   const customersRef = ref(rtdb, 'customers');
   const newCustomerRef = push(customersRef);
   const now = Date.now();
+  const idImages = data.idImageUrls && data.idImageUrls.length > 0 ? data.idImageUrls : [];
 
   // Persist the exact field names requested by product plus legacy aliases for existing UI.
   await set(newCustomerRef, {
@@ -56,7 +58,8 @@ export const createCustomer = async (data: RtdbCustomerInput): Promise<string> =
     city: data.city ?? '',
     idType: 'Aadhaar',
     idNumber: data.idNumber,
-    idImageUrl: data.idImageUrl ?? '',
+    idImageUrl: idImages[0] ?? data.idImageUrl ?? '',
+    idImageUrls: idImages.length ? idImages : data.idImageUrl ? [data.idImageUrl] : [],
     checkInDate: data.checkInDate,
     checkOutDate: data.checkOutDate,
     selectedRoom: data.selectedRoom,
@@ -234,6 +237,7 @@ export const fetchCustomers = async (): Promise<
     createdAt?: number;
     checkInDate?: string;
     idImageUrl?: string;
+    idImageUrls?: string[];
   }>
 > => {
   const customersRef = ref(rtdb, 'customers');
@@ -256,6 +260,7 @@ export const fetchCustomers = async (): Promise<
       createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
       checkInDate: c.checkInDate,
       idImageUrl: c.idImageUrl || c.id_image_url || '',
+      idImageUrls: c.idImageUrls || [],
     };
   });
 };
@@ -276,6 +281,7 @@ export const fetchCustomerById = async (
   createdAt?: number;
   checkInDate?: string;
   idImageUrl?: string;
+  idImageUrls?: string[];
 } | null> => {
   const snap = await get(ref(rtdb, `customers/${id}`));
   if (!snap.exists()) return null;
@@ -294,6 +300,7 @@ export const fetchCustomerById = async (
     createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
     checkInDate: c.checkInDate,
     idImageUrl: c.idImageUrl || c.id_image_url || '',
+    idImageUrls: c.idImageUrls || [],
   };
 };
 
@@ -309,11 +316,12 @@ export const subscribeToCustomers = (
       id_number?: string;
       id_type?: string;
       membersCount?: number;
-    vehicleNumber?: string;
-    createdAt?: number;
-    checkInDate?: string;
-    idImageUrl?: string;
-  }>
+      vehicleNumber?: string;
+      createdAt?: number;
+      checkInDate?: string;
+      idImageUrl?: string;
+      idImageUrls?: string[];
+    }>
   ) => void,
   onError?: (error: unknown) => void
 ) => {

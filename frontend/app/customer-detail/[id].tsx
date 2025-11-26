@@ -46,7 +46,14 @@ const CustomerDetailScreen = () => {
         <InfoRow label="Vehicle Number" value={customer.vehicleNumber} />
         <InfoRow label="ID Type" value={customer.id_type} />
         <InfoRow label="ID Number" value={customer.id_number} />
-        {customer.idImageUrl ? (
+        {customer.idImageUrls && customer.idImageUrls.length > 0 ? (
+          <View style={styles.imageWrapper}>
+            <Text style={styles.imageLabel}>ID Images</Text>
+            {customer.idImageUrls.map((uri: string, idx: number) => (
+              <Image key={idx} source={{ uri }} style={styles.idImage} />
+            ))}
+          </View>
+        ) : customer.idImageUrl ? (
           <View style={styles.imageWrapper}>
             <Text style={styles.imageLabel}>ID Image</Text>
             <Image source={{ uri: customer.idImageUrl }} style={styles.idImage} />

@@ -27,6 +27,7 @@ type CustomerListItem = {
   createdAt?: number;
   checkInDate?: string;
   idImageUrl?: string;
+  idImageUrls?: string[];
 };
 
 type SortMode = 'recent' | 'month';

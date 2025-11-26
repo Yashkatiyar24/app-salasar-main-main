@@ -22,16 +22,5 @@ export default function Index() {
     }
   }, [user, loading, segments]);
 
-  if (loading) {
-    return <LoadingSpinner message="Loading..." />;
-  }
-
-  // Default redirect based on auth state
-  if (!user) {
-    router.replace('/login');
-  } else {
-    router.replace('/dashboard');
-  }
-
   return <LoadingSpinner message="Redirecting..." />;
 }

@@ -45,6 +45,7 @@ const NewBookingScreen: React.FC = () => {
   // ID Proof
   const [idNumber, setIdNumber] = useState('');
   const [idImageUrl, setIdImageUrl] = useState('');
+  const [idImageUrls, setIdImageUrls] = useState<string[]>([]);
 
   // Booking Details: Date | null state (default to today / tomorrow for better UX)
   const [checkInDate, setCheckInDate] = useState<Date | null>(new Date());
@@ -106,6 +107,7 @@ const NewBookingScreen: React.FC = () => {
     setCity('');
     setIdNumber('');
     setIdImageUrl('');
+    setIdImageUrls([]);
     setCheckInDate(null);
     setCheckOutDate(null);
     setSelectedRoom(null);
@@ -158,12 +160,12 @@ const NewBookingScreen: React.FC = () => {
 
   const pickIdImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to photos to attach an ID image.');
+        Alert.alert('Permission needed', 'Please allow camera access to attach an ID image.');
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.7,
         base64: true, // store a portable preview in RTDB
@@ -171,9 +173,12 @@ const NewBookingScreen: React.FC = () => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         if (asset.base64) {
-          setIdImageUrl(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
+          const uri = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`;
+          setIdImageUrl(uri);
+          setIdImageUrls((prev) => [...prev, uri]);
         } else if (asset.uri) {
           setIdImageUrl(asset.uri);
+          setIdImageUrls((prev) => [...prev, asset.uri]);
         }
       }
     } catch (err) {
@@ -181,6 +186,61 @@ const NewBookingScreen: React.FC = () => {
       Alert.alert('Error', 'Unable to pick image');
     }
   };
+
+  const pickIdImagesFromLibrary = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow photo access to attach ID images.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+        allowsMultipleSelection: true,
+        selectionLimit: 5,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newUris: string[] = [];
+        result.assets.forEach((asset) => {
+          if (asset.base64) {
+            newUris.push(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
+          } else if (asset.uri) {
+            newUris.push(asset.uri);
+          }
+        });
+        if (newUris.length > 0) {
+          setIdImageUrl(newUris[0]); // keep first as primary
+          setIdImageUrls((prev) => [...prev, ...newUris]);
+        }
+      }
+    } catch (err) {
+      console.error('Image pick error', err);
+      Alert.alert('Error', 'Unable to pick images');
+    }
+  };
+
+  const addManualImageUrl = () => {
+    const trimmed = idImageUrl.trim();
+    if (!trimmed) return;
+    setIdImageUrls((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+  };
+
+  const removeImageAt = (idx: number) => {
+    setIdImageUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Keep primary URL in sync with list for backward compatibility fields
+  useEffect(() => {
+    if (idImageUrls.length > 0) {
+      setIdImageUrl(idImageUrls[0]);
+    } else if (idImageUrl && idImageUrls.length === 0) {
+      // keep manual single value
+      setIdImageUrls([idImageUrl]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idImageUrls]);
 
   const validateForm = () => {
     if (!guestName.trim()) {
@@ -243,6 +303,8 @@ const NewBookingScreen: React.FC = () => {
         checkInDate: checkInDate.toISOString(),
         checkOutDate: checkOutDate.toISOString(),
         selectedRoom: selectedRoom.room_no.toString(),
+        idImageUrls,
+        idImageUrl: idImageUrls[0] ?? idImageUrl ?? undefined,
       });
 
 
@@ -388,25 +450,50 @@ const NewBookingScreen: React.FC = () => {
           value={idNumber}
           onChangeText={setIdNumber}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="ID Image URL"
-          value={idImageUrl}
-          onChangeText={setIdImageUrl}
-        />
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[styles.input, { flex: 1 }]}
+            placeholder="ID Image URL"
+            value={idImageUrl}
+            onChangeText={setIdImageUrl}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity style={styles.addUrlButton} onPress={addManualImageUrl}>
+            <Text style={styles.addUrlText}>Add</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.imageRow}>
           <TouchableOpacity style={styles.imageButton} onPress={pickIdImage}>
-            <Ionicons name="image" size={18} color="#fff" />
-            <Text style={styles.imageButtonText}>Pick ID Image</Text>
+            <Ionicons name="camera" size={18} color="#fff" />
+            <Text style={styles.imageButtonText}>Camera</Text>
           </TouchableOpacity>
-          {idImageUrl ? (
-            <Pressable onPress={() => setIdImageUrl('')} style={styles.clearImageButton}>
-              <Text style={styles.clearImageText}>Remove</Text>
+          <TouchableOpacity style={styles.imageButtonSecondary} onPress={pickIdImagesFromLibrary}>
+            <Ionicons name="images" size={18} color="#dc2626" />
+            <Text style={styles.imageButtonTextSecondary}>Gallery</Text>
+          </TouchableOpacity>
+          {idImageUrls.length > 0 && (
+            <Pressable
+              onPress={() => {
+                setIdImageUrls([]);
+                setIdImageUrl('');
+              }}
+              style={styles.clearImageButton}
+            >
+              <Text style={styles.clearImageText}>Clear</Text>
             </Pressable>
-          ) : null}
+          )}
         </View>
-        {idImageUrl ? (
-          <Image source={{ uri: idImageUrl }} style={styles.previewImage} />
+        {idImageUrls.length > 0 ? (
+          <View style={styles.previewList}>
+            {idImageUrls.map((uri, idx) => (
+              <View key={idx} style={styles.previewItem}>
+                <Image source={{ uri }} style={styles.previewImage} />
+                <Pressable style={styles.removeThumb} onPress={() => removeImageAt(idx)}>
+                  <Ionicons name="close" size={16} color="#fff" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
         ) : null}
 
         <Text style={styles.sectionTitle}>Booking Details</Text>
@@ -556,6 +643,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  addUrlButton: {
+    backgroundColor: '#dc2626',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  addUrlText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
   imageRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -575,6 +678,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  imageButtonSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dc2626',
+  },
+  imageButtonTextSecondary: {
+    color: '#dc2626',
+    fontWeight: '600',
+  },
   clearImageButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -590,6 +708,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     resizeMode: 'contain',
     backgroundColor: '#f3f4f6',
+  },
+  previewList: {
+    marginTop: 8,
+    gap: 8,
+  },
+  previewItem: {
+    position: 'relative',
+  },
+  removeThumb: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 4,
   },
   roomsGrid: {
     flexDirection: 'row',

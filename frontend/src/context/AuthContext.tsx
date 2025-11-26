@@ -36,6 +36,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (uid: string) => {
+    // First try cached profile to avoid blocking when offline
+    try {
+      const cached = await AsyncStorage.getItem('userProfile');
+      if (cached) {
+        setProfile(JSON.parse(cached));
+      }
+    } catch {
+      // ignore cache errors
+    }
+
     try {
       const profileDoc = await getDoc(doc(db, 'profiles', uid));
       if (profileDoc.exists()) {
@@ -48,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setProfile(null);
+      // Keep any cached profile instead of nulling it if offline
     }
   };
 
