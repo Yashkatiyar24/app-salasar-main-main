@@ -13,6 +13,7 @@ import {
   Image,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ import {
 import { defaultRoomSeeds } from '../src/utils/defaultRooms';
 import { TOTAL_ROOMS } from '../src/utils/roomConstants';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const NewBookingScreen: React.FC = () => {
   const router = useRouter();
@@ -46,6 +48,7 @@ const NewBookingScreen: React.FC = () => {
   const [idNumber, setIdNumber] = useState('');
   const [idImageUrl, setIdImageUrl] = useState('');
   const [idImageUrls, setIdImageUrls] = useState<string[]>([]);
+  const placeholderColor = '#555';
 
   // Booking Details: Date | null state (default to today / tomorrow for better UX)
   const [checkInDate, setCheckInDate] = useState<Date | null>(new Date());
@@ -167,18 +170,17 @@ const NewBookingScreen: React.FC = () => {
       }
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-        base64: true, // store a portable preview in RTDB
+        quality: 0.8,
+        base64: true,
+        allowsEditing: true,
+        aspect: [4, 5],
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        if (asset.base64) {
-          const uri = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`;
-          setIdImageUrl(uri);
-          setIdImageUrls((prev) => [...prev, uri]);
-        } else if (asset.uri) {
-          setIdImageUrl(asset.uri);
-          setIdImageUrls((prev) => [...prev, asset.uri]);
+        const dataUri = await assetToDataUri(asset);
+        if (dataUri) {
+          setIdImageUrl(dataUri);
+          setIdImageUrls((prev) => [...prev, dataUri]);
         }
       }
     } catch (err) {
@@ -196,20 +198,19 @@ const NewBookingScreen: React.FC = () => {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
+        quality: 0.8,
         base64: true,
         allowsMultipleSelection: true,
         selectionLimit: 5,
+        allowsEditing: true,
+        aspect: [4, 5],
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const newUris: string[] = [];
-        result.assets.forEach((asset) => {
-          if (asset.base64) {
-            newUris.push(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
-          } else if (asset.uri) {
-            newUris.push(asset.uri);
-          }
-        });
+        for (const asset of result.assets) {
+          const dataUri = await assetToDataUri(asset);
+          if (dataUri) newUris.push(dataUri);
+        }
         if (newUris.length > 0) {
           setIdImageUrl(newUris[0]); // keep first as primary
           setIdImageUrls((prev) => [...prev, ...newUris]);
@@ -229,6 +230,23 @@ const NewBookingScreen: React.FC = () => {
 
   const removeImageAt = (idx: number) => {
     setIdImageUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const assetToDataUri = async (asset: ImagePicker.ImagePickerAsset) => {
+    const mime = asset.mimeType || 'image/jpeg';
+    if (asset.base64) {
+      return `data:${mime};base64,${asset.base64}`;
+    }
+    if (asset.uri) {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+        return `data:${mime};base64,${base64}`;
+      } catch (e) {
+        console.warn('Failed to read image as base64', e);
+        return asset.uri;
+      }
+    }
+    return null;
   };
 
   // Keep primary URL in sync with list for backward compatibility fields
@@ -389,29 +407,33 @@ const NewBookingScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>New Booking / Check-in</Text>
 
         <Text style={styles.sectionTitle}>Guest Details</Text>
         <TextInput
           style={styles.input}
           placeholder="Guest Name *"
+          placeholderTextColor={placeholderColor}
           value={guestName}
           onChangeText={setGuestName}
         />
         <TextInput
           style={styles.input}
           placeholder="Father's Name"
+          placeholderTextColor={placeholderColor}
           value={fatherName}
           onChangeText={setFatherName}
         />
         <TextInput
           style={styles.input}
           placeholder="Mobile Number *"
+          placeholderTextColor={placeholderColor}
           value={mobileNumber}
           onChangeText={setMobileNumber}
           keyboardType="phone-pad"
@@ -419,6 +441,7 @@ const NewBookingScreen: React.FC = () => {
         <TextInput
           style={styles.input}
           placeholder="Number of Members *"
+          placeholderTextColor={placeholderColor}
           value={membersCount}
           onChangeText={setMembersCount}
           keyboardType="number-pad"
@@ -426,18 +449,21 @@ const NewBookingScreen: React.FC = () => {
         <TextInput
           style={styles.input}
           placeholder="Vehicle Number"
+          placeholderTextColor={placeholderColor}
           value={vehicleNumber}
           onChangeText={setVehicleNumber}
         />
         <TextInput
           style={styles.input}
           placeholder="Address"
+          placeholderTextColor={placeholderColor}
           value={address}
           onChangeText={setAddress}
         />
         <TextInput
           style={styles.input}
           placeholder="City"
+          placeholderTextColor={placeholderColor}
           value={city}
           onChangeText={setCity}
         />
@@ -447,6 +473,7 @@ const NewBookingScreen: React.FC = () => {
         <TextInput
           style={styles.input}
           placeholder="ID Number *"
+          placeholderTextColor={placeholderColor}
           value={idNumber}
           onChangeText={setIdNumber}
         />
@@ -454,6 +481,7 @@ const NewBookingScreen: React.FC = () => {
           <TextInput
             style={[styles.input, { flex: 1 }]}
             placeholder="ID Image URL"
+            placeholderTextColor={placeholderColor}
             value={idImageUrl}
             onChangeText={setIdImageUrl}
             autoCapitalize="none"
@@ -608,23 +636,25 @@ const NewBookingScreen: React.FC = () => {
           />
         )}
 
-        <TouchableOpacity
-          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-          onPress={handleCreateBooking}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Create Booking</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <TouchableOpacity
+            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            onPress={handleCreateBooking}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Booking</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f9fafb' },
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { padding: 16, paddingBottom: 32 },
   title: { fontSize: 22, fontWeight: 'bold', color: '#111827', marginBottom: 12 },

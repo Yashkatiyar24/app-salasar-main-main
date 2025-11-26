@@ -120,7 +120,7 @@ const RoomsScreen = () => {
         renderItem={({ item }) => (
           <RoomCard
             room={mapRtdbRoomToRoomCard(item)}
-            onPress={() => {}}
+            onPress={() => router.push('/dashboard' as any)}
           />
         )}
         keyExtractor={(item) => item.key}
@@ -140,7 +140,7 @@ const RoomsScreen = () => {
       {profile?.role === 'ADMIN' && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => router.push('/room-detail/new' as any)}
+          onPress={() => router.push('/dashboard' as any)}
         >
           <Ionicons name="add" size={32} color="#fff" />
         </TouchableOpacity>

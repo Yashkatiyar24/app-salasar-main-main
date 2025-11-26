@@ -6,7 +6,7 @@ type SeedRoom = {
   beds: number;
   type: string;
   ac_make: string;
-  remarks: string;
+  remarks: string; // kept in type but values will be removed
   is_available: boolean;
   current_booking_id: string | null;
 };
@@ -14,22 +14,21 @@ type SeedRoom = {
 const rawRooms: SeedRoom[] = [
   { room_no: 1, beds: 1, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 2, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
-  { room_no: 3, beds: 3, type: 'AC', ac_make: 'LLOYD', remarks: '2 Bed rooms - 8', is_available: true, current_booking_id: null },
-  { room_no: 4, beds: 2, type: 'AC', ac_make: '', remarks: '3 Bed rooms - 12', is_available: true, current_booking_id: null },
-  { room_no: 5, beds: 3, type: 'AC', ac_make: '', remarks: '4 Bed rooms - 15', is_available: true, current_booking_id: null },
-  { room_no: 6, beds: 4, type: 'AC', ac_make: '', remarks: '6 Bed rooms - 3', is_available: true, current_booking_id: null },
-  { room_no: 7, beds: 4, type: 'AC', ac_make: '', remarks: 'total rooms 38', is_available: true, current_booking_id: null },
+  { room_no: 3, beds: 3, type: 'AC', ac_make: 'LLOYD', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 4, beds: 2, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 5, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 7, beds: 4, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 8, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 9, beds: 2, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
-  { room_no: 10, beds: 3, type: 'AC', ac_make: '', remarks: '2 Bed AC rooms - 6', is_available: true, current_booking_id: null },
-  { room_no: 11, beds: 3, type: 'AC', ac_make: '', remarks: '3 Bed AC rooms - 12', is_available: true, current_booking_id: null },
-  { room_no: 101, beds: 4, type: 'AC', ac_make: '', remarks: '4 Bed AC rooms - 12', is_available: true, current_booking_id: null },
-  { room_no: 102, beds: 3, type: 'AC', ac_make: '', remarks: '6 Bed AC rooms - 3', is_available: true, current_booking_id: null },
-  { room_no: 103, beds: 3, type: 'AC', ac_make: '', remarks: 'Total AC rooms - 33', is_available: true, current_booking_id: null },
+  { room_no: 10, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 11, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 101, beds: 4, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 102, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 103, beds: 3, type: 'AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 104, beds: 2, type: 'Non AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 105, beds: 2, type: 'AC', ac_make: 'LLOYD', remarks: '', is_available: true, current_booking_id: null },
-  { room_no: 106, beds: 3, type: 'AC', ac_make: 'LLOYD', remarks: '2 Bed Non AC - 2', is_available: true, current_booking_id: null },
-  { room_no: 107, beds: 0, type: 'Staff Room', ac_make: '', remarks: '4 Bed Non AC - 3', is_available: true, current_booking_id: null },
+  { room_no: 106, beds: 3, type: 'AC', ac_make: 'LLOYD', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 107, beds: 0, type: 'Staff Room', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 108, beds: 0, type: 'Staff Room', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 109, beds: 0, type: 'Staff Room', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 110, beds: 0, type: 'Staff Room', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
@@ -61,6 +60,7 @@ const rawRooms: SeedRoom[] = [
 
 export const defaultRoomSeeds = rawRooms.map((room) => {
   const status: RoomStatus = room.is_available ? DEFAULT_ROOM_STATUS : 'OCCUPIED';
+
   return {
     room_number: room.room_no.toString(),
     type: room.type,
@@ -68,7 +68,7 @@ export const defaultRoomSeeds = rawRooms.map((room) => {
     price_per_night: 0,
     status,
     ac_make: room.ac_make,
-    remarks: room.remarks,
+    remarks: '', // force remove remarks everywhere
     current_booking_id: room.current_booking_id ?? undefined,
   };
 });
