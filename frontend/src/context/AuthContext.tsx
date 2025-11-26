@@ -5,10 +5,29 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromCache } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { UserProfile } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const elevateIfSarita = (user: User | null, profile: UserProfile | null): UserProfile | null => {
+  const name = (profile?.full_name || user?.displayName || '').trim().toLowerCase();
+  const email = (profile?.email || user?.email || '').trim().toLowerCase();
+  const isSarita =
+    name === 'sarita rohilla' ||
+    email === 'sarita rohilla' ||
+    email === 'sarita@salasar.com' ||
+    email === 'sarita.rohilla@salasar.com';
+  if (isSarita) {
+    return {
+      id: profile?.id || user?.uid || 'sarita-admin',
+      full_name: 'Sarita Rohilla',
+      role: 'ADMIN',
+      email: profile?.email || user?.email || 'sarita@salasar.com',
+    };
+  }
+  return profile;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -46,10 +65,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore cache errors
     }
 
+    // Try cache from Firestore, then network; don't block forever
+    try {
+      const cachedDoc = await getDocFromCache(doc(db, 'profiles', uid));
+      if (cachedDoc.exists()) {
+        let profileData = cachedDoc.data() as UserProfile;
+        profileData = elevateIfSarita(auth.currentUser, profileData) || profileData;
+        setProfile(profileData);
+        await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+        return;
+      }
+    } catch {
+      // cache miss or offline; continue to network attempt
+    }
+
     try {
       const profileDoc = await getDoc(doc(db, 'profiles', uid));
       if (profileDoc.exists()) {
-        const profileData = profileDoc.data() as UserProfile;
+        let profileData = profileDoc.data() as UserProfile;
+        profileData = elevateIfSarita(auth.currentUser, profileData) || profileData;
         setProfile(profileData);
         await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
       } else {
@@ -57,8 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
     } catch (error) {
+      // Permission denied / offline: fall back to cached or minimal profile so app keeps working
       console.error('Error fetching profile:', error);
-      // Keep any cached profile instead of nulling it if offline
+      setProfile((prev) => {
+        if (prev) return prev;
+        const fallback: UserProfile = {
+          id: uid,
+          full_name: auth.currentUser?.displayName || auth.currentUser?.email || 'User',
+          email: auth.currentUser?.email || 'N/A',
+          role: 'STAFF',
+        };
+        return elevateIfSarita(auth.currentUser, fallback) || fallback;
+      });
     }
   };
 
@@ -68,6 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (firebaseUser) {
         await fetchUserProfile(firebaseUser.uid);
+        // fallback: if no profile or needs elevation
+        setProfile((prev) => elevateIfSarita(firebaseUser, prev) || prev);
       } else {
         setProfile(null);
         await AsyncStorage.removeItem('userProfile');

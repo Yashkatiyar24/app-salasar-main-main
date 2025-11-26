@@ -10,9 +10,11 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { useRouter } from 'expo-router';
+import SalasarLogo from '../assets/images/logo.jpeg';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -20,7 +22,6 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
-  const { demoSignIn } = useAuth();
   const router = useRouter();
 
   const handleSignIn = async () => {
@@ -43,102 +44,82 @@ const LoginScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.card}>
-          {/* Logo - Using placeholder, replace with actual logo */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoText}>Shri Salasar{"\n"}Sewa Sadan</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={SalasarLogo}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-          </View>
 
-          <Text style={styles.title}>Shri Salasar Sewa Sadan</Text>
-          <Text style={styles.subtitle}>Hotel Management System</Text>
+            <Text style={styles.title}>Shri Salasar Sewa Sadan</Text>
+            <Text style={styles.subtitle}>Hotel Management System</Text>
 
-          {/* Email Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="admin@salasar.com"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!loading}
-            />
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="admin@salasar.com"
+                placeholderTextColor="#6b7280"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </View>
 
-          {/* Password Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor="#6b7280"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
 
-          {/* Error Message */}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {/* Sign In Button */}
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Demo Button (dev only) */}
-          {__DEV__ && demoSignIn ? (
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#2563eb', marginTop: 12 }]}
-              onPress={async () => {
-                setLoading(true);
-                try {
-                  await demoSignIn();
-                  router.replace('/dashboard');
-                } catch (e: any) {
-                  setError(e.message || 'Demo sign-in failed');
-                } finally {
-                  setLoading(false);
-                }
-              }}
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSignIn}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Use Demo</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
-          ) : null}
-
-          {/* Demo Credentials */}
-          <Text style={styles.demoText}>
-            Demo credentials: admin@salasar.com / admin123
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#111',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#111',
   },
   scrollContent: {
     flexGrow: 1,
@@ -146,40 +127,33 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 32,
+    alignSelf: 'center',
+    backgroundColor: '#1b1b1b',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  logoPlaceholder: {
+  logoImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#fef3c7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#f59e0b',
-  },
-  logoText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#92400e',
-    textAlign: 'center',
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#1f2937',
+    color: '#e5e7eb',
     marginBottom: 8,
   },
   subtitle: {
@@ -190,21 +164,22 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 20,
+    width: '100%',
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: '#d1d5db',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#2d2d2d',
     borderRadius: 8,
     padding: 14,
     fontSize: 16,
-    backgroundColor: '#f9fafb',
-    color: '#1f2937',
+    backgroundColor: '#131313',
+    color: '#e5e7eb',
   },
   error: {
     color: '#dc2626',
@@ -218,6 +193,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
+    width: '100%',
   },
   buttonDisabled: {
     backgroundColor: '#f87171',
@@ -226,12 +202,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  demoText: {
-    textAlign: 'center',
-    color: '#9ca3af',
-    fontSize: 12,
-    marginTop: 16,
   },
 });
 

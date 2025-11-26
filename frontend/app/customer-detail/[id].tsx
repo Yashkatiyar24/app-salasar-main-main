@@ -1,14 +1,21 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Image, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LoadingSpinner from '../../src/components/LoadingSpinner';
-import { fetchCustomerById } from '../../src/utils/rtdbService';
+import { fetchCustomerById, updateCustomer, deleteCustomer } from '../../src/utils/rtdbService';
+import { useAuth } from '../../src/context/AuthContext';
 
 const CustomerDetailScreen = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<any>(null);
+  const [editing, setEditing] = useState(false);
+  const { profile } = useAuth();
+  const isAdmin =
+    profile?.role === 'ADMIN' ||
+    (profile?.full_name || '').trim().toLowerCase() === 'sarita rohilla' ||
+    (profile?.email || '').trim().toLowerCase() === 'sarita@salasar.com';
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -29,6 +36,51 @@ const CustomerDetailScreen = () => {
     load();
   }, [load]);
 
+  const handleSave = async () => {
+    if (!id || !customer) return;
+    try {
+      await updateCustomer(id, {
+        guestName: customer.name,
+        fatherName: customer.father_name,
+        mobileNumber: customer.mobile,
+        address: customer.address,
+        city: customer.city,
+        membersCount: customer.membersCount ? Number(customer.membersCount) : undefined,
+        vehicleNumber: customer.vehicleNumber,
+        idNumber: customer.id_number,
+        idImageUrl: customer.idImageUrl,
+        idImageUrls: customer.idImageUrls,
+      });
+      Alert.alert('Saved', 'Customer updated');
+      setEditing(false);
+      load();
+    } catch (err) {
+      console.error('Update error', err);
+      Alert.alert('Error', 'Failed to save customer');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    Alert.alert('Delete Customer', 'Are you sure you want to delete this customer?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteCustomer(id);
+            Alert.alert('Deleted', 'Customer removed');
+            router.back();
+          } catch (err) {
+            console.error('Delete error', err);
+            Alert.alert('Error', 'Failed to delete customer');
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading || !customer) {
     return <LoadingSpinner message="Loading customer..." />;
   }
@@ -37,15 +89,15 @@ const CustomerDetailScreen = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Customer Detail</Text>
       <View style={styles.card}>
-        <InfoRow label="Name" value={customer.name} />
-        <InfoRow label="Father's Name" value={customer.father_name} />
-        <InfoRow label="Mobile" value={customer.mobile} />
-        <InfoRow label="City" value={customer.city} />
-        <InfoRow label="Address" value={customer.address} />
-        <InfoRow label="Members" value={customer.membersCount} />
-        <InfoRow label="Vehicle Number" value={customer.vehicleNumber} />
-        <InfoRow label="ID Type" value={customer.id_type} />
-        <InfoRow label="ID Number" value={customer.id_number} />
+        <InfoInput label="Name" value={customer.name} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, name: v })} />
+        <InfoInput label="Father's Name" value={customer.father_name} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, father_name: v })} />
+        <InfoInput label="Mobile" value={customer.mobile} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, mobile: v })} />
+        <InfoInput label="City" value={customer.city} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, city: v })} />
+        <InfoInput label="Address" value={customer.address} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, address: v })} />
+        <InfoInput label="Members" value={customer.membersCount} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, membersCount: v })} />
+        <InfoInput label="Vehicle Number" value={customer.vehicleNumber} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, vehicleNumber: v })} />
+        <InfoInput label="ID Type" value={customer.id_type} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, id_type: v })} />
+        <InfoInput label="ID Number" value={customer.id_number} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, id_number: v })} />
         {customer.idImageUrls && customer.idImageUrls.length > 0 ? (
           <View style={styles.imageWrapper}>
             <Text style={styles.imageLabel}>ID Images</Text>
@@ -60,14 +112,49 @@ const CustomerDetailScreen = () => {
           </View>
         ) : null}
       </View>
+
+      {isAdmin ? (
+        <View style={styles.actionsRow}>
+          {!editing ? (
+            <TouchableOpacity style={[styles.actionBtn, styles.editBtn]} onPress={() => setEditing(true)}>
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSave}>
+              <Text style={styles.actionText}>Save</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={handleDelete}>
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </ScrollView>
   );
 };
 
-const InfoRow = ({ label, value }: { label: string; value?: string | number }) => (
+const InfoInput = ({
+  label,
+  value,
+  editable,
+  onChange,
+}: {
+  label: string;
+  value?: string | number;
+  editable: boolean;
+  onChange: (v: string) => void;
+}) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value || '-'}</Text>
+    {editable ? (
+      <TextInput
+        style={styles.infoInput}
+        value={value?.toString() || ''}
+        onChangeText={onChange}
+      />
+    ) : (
+      <Text style={styles.infoValue}>{value || '-'}</Text>
+    )}
   </View>
 );
 
@@ -109,6 +196,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  infoInput: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minWidth: 180,
+    color: '#111827',
+  },
   imageWrapper: {
     marginTop: 12,
     gap: 6,
@@ -123,6 +219,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#e5e7eb',
     resizeMode: 'contain',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+  },
+  editBtn: {
+    backgroundColor: '#f59e0b',
+  },
+  saveBtn: {
+    backgroundColor: '#10b981',
+  },
+  deleteBtn: {
+    backgroundColor: '#ef4444',
+  },
+  actionText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
 

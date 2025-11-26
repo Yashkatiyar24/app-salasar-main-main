@@ -1,26 +1,20 @@
 import React, { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 
 export default function Index() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const segments = useSegments();
 
   useEffect(() => {
     if (loading) return;
-
-    const inAuthGroup = segments[0] === '(tabs)';
-
-    if (!user && inAuthGroup) {
-      // Redirect to login if not authenticated
+    if (!user) {
       router.replace('/login');
-    } else if (user && !inAuthGroup) {
-      // Redirect to dashboard if authenticated
+    } else {
       router.replace('/dashboard');
     }
-  }, [user, loading, segments]);
+  }, [user, loading, router]);
 
   return <LoadingSpinner message="Redirecting..." />;
 }

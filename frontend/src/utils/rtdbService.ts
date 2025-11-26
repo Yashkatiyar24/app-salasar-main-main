@@ -41,6 +41,54 @@ export type RtdbCustomerInput = {
   selectedRoom: string | number;
 };
 
+export const updateCustomer = async (
+  id: string,
+  data: Partial<RtdbCustomerInput>
+): Promise<void> => {
+  const now = Date.now();
+  const idImages = data.idImageUrls && data.idImageUrls.length > 0 ? data.idImageUrls : undefined;
+  const updates: any = {
+    updatedAt: now,
+  };
+
+  const maybeAssign = (key: string, value: any) => {
+    if (value !== undefined) updates[key] = value;
+  };
+
+  maybeAssign('guestName', data.guestName);
+  maybeAssign('fatherName', data.fatherName);
+  maybeAssign('mobileNumber', data.mobileNumber);
+  maybeAssign('membersCount', data.membersCount);
+  maybeAssign('vehicleNumber', data.vehicleNumber);
+  maybeAssign('address', data.address);
+  maybeAssign('city', data.city);
+  maybeAssign('idType', data.idImageUrl || idImages ? 'Aadhaar' : undefined);
+  maybeAssign('idNumber', data.idNumber);
+  maybeAssign('idImageUrl', idImages ? idImages[0] : data.idImageUrl);
+  maybeAssign('idImageUrls', idImages);
+  maybeAssign('checkInDate', data.checkInDate);
+  maybeAssign('checkOutDate', data.checkOutDate);
+  maybeAssign('selectedRoom', data.selectedRoom);
+
+  // legacy aliases
+  maybeAssign('name', data.guestName);
+  maybeAssign('father_name', data.fatherName);
+  maybeAssign('phone', data.mobileNumber);
+  maybeAssign('member_count', data.membersCount);
+  maybeAssign('vehicle_number', data.vehicleNumber);
+  maybeAssign('address', data.address);
+  maybeAssign('city', data.city);
+  maybeAssign('id_number', data.idNumber);
+  maybeAssign('id_image_url', idImages ? idImages[0] : data.idImageUrl);
+  maybeAssign('id_image_urls', idImages);
+
+  await update(ref(rtdb, `customers/${id}`), updates);
+};
+
+export const deleteCustomer = async (id: string): Promise<void> => {
+  await set(ref(rtdb, `customers/${id}`), null);
+};
+
 export const createCustomer = async (data: RtdbCustomerInput): Promise<string> => {
   const customersRef = ref(rtdb, 'customers');
   const newCustomerRef = push(customersRef);

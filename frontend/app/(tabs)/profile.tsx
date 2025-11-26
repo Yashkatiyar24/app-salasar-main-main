@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import LoadingSpinner from '../../src/components/LoadingSpinner';
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
 
   const handleSignOut = () => {
     Alert.alert(
@@ -39,8 +39,39 @@ const ProfileScreen = () => {
     );
   };
 
-  if (!profile) {
+  if (loading && !profile) {
     return <LoadingSpinner message="Loading profile..." />;
+  }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
+  if (!user && !loading) {
+    return <LoadingSpinner message="Redirecting..." />;
+  }
+
+  const effectiveProfile =
+    profile ||
+    (user && {
+      full_name: user.displayName || user.email || 'User',
+      email: user.email || 'N/A',
+      role:
+        (user.displayName || '').trim().toLowerCase() === 'sarita rohilla' ||
+        (user.email || '').trim().toLowerCase() === 'sarita@salasar.com'
+          ? 'ADMIN'
+          : 'STAFF',
+      id: user.uid,
+    });
+
+  if (!effectiveProfile) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#6b7280' }}>No profile found.</Text>
+      </View>
+    );
   }
 
   return (
@@ -52,9 +83,14 @@ const ProfileScreen = () => {
             <Ionicons name="person" size={48} color="#fff" />
           </View>
         </View>
-        <Text style={styles.name}>{profile.full_name}</Text>
-        <View style={[styles.roleBadge, profile.role === 'ADMIN' ? styles.adminBadge : styles.staffBadge]}>
-          <Text style={styles.roleText}>{profile.role}</Text>
+        <Text style={styles.name}>{effectiveProfile.full_name}</Text>
+        <View
+          style={[
+            styles.roleBadge,
+            effectiveProfile.role === 'ADMIN' ? styles.adminBadge : styles.staffBadge,
+          ]}
+        >
+          <Text style={styles.roleText}>{effectiveProfile.role}</Text>
         </View>
       </View>
 
@@ -66,7 +102,7 @@ const ProfileScreen = () => {
           </View>
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>Email</Text>
-            <Text style={styles.detailValue}>{profile.email}</Text>
+            <Text style={styles.detailValue}>{effectiveProfile.email}</Text>
           </View>
         </View>
 
@@ -76,7 +112,7 @@ const ProfileScreen = () => {
           </View>
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>Role</Text>
-            <Text style={styles.detailValue}>{profile.role}</Text>
+            <Text style={styles.detailValue}>{effectiveProfile.role}</Text>
           </View>
         </View>
 
@@ -86,7 +122,7 @@ const ProfileScreen = () => {
           </View>
           <View style={styles.detailContent}>
             <Text style={styles.detailLabel}>User ID</Text>
-            <Text style={styles.detailValue}>{profile.id}</Text>
+            <Text style={styles.detailValue}>{effectiveProfile.id}</Text>
           </View>
         </View>
       </View>
@@ -107,7 +143,7 @@ const ProfileScreen = () => {
             <Ionicons name="checkmark-circle" size={20} color="#10b981" />
             <Text style={styles.permissionText}>View Customers</Text>
           </View>
-          {profile.role === 'ADMIN' && (
+          {effectiveProfile.role === 'ADMIN' && (
             <>
               <View style={styles.permissionItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#10b981" />
