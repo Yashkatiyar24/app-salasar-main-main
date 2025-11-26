@@ -233,6 +233,7 @@ export const fetchCustomers = async (): Promise<
     vehicleNumber?: string;
     createdAt?: number;
     checkInDate?: string;
+    idImageUrl?: string;
   }>
 > => {
   const customersRef = ref(rtdb, 'customers');
@@ -254,6 +255,7 @@ export const fetchCustomers = async (): Promise<
       vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
       createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
       checkInDate: c.checkInDate,
+      idImageUrl: c.idImageUrl || c.id_image_url || '',
     };
   });
 };
@@ -273,6 +275,7 @@ export const fetchCustomerById = async (
   vehicleNumber?: string;
   createdAt?: number;
   checkInDate?: string;
+  idImageUrl?: string;
 } | null> => {
   const snap = await get(ref(rtdb, `customers/${id}`));
   if (!snap.exists()) return null;
@@ -290,6 +293,7 @@ export const fetchCustomerById = async (
     vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
     createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
     checkInDate: c.checkInDate,
+    idImageUrl: c.idImageUrl || c.id_image_url || '',
   };
 };
 
@@ -305,10 +309,11 @@ export const subscribeToCustomers = (
       id_number?: string;
       id_type?: string;
       membersCount?: number;
-      vehicleNumber?: string;
-      createdAt?: number;
-      checkInDate?: string;
-    }>
+    vehicleNumber?: string;
+    createdAt?: number;
+    checkInDate?: string;
+    idImageUrl?: string;
+  }>
   ) => void,
   onError?: (error: unknown) => void
 ) => {
@@ -331,13 +336,14 @@ export const subscribeToCustomers = (
         id_number: c.idNumber || c.id_number || '',
         id_type: c.idType || c.id_type || 'Aadhaar',
         membersCount: c.membersCount || c.member_count || 1,
-        vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
-        createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
-        checkInDate: c.checkInDate,
-      };
-    });
-    callback(mapped);
-  };
+      vehicleNumber: c.vehicleNumber || c.vehicle_number || '',
+      createdAt: typeof c.createdAt === 'number' ? c.createdAt : undefined,
+      checkInDate: c.checkInDate,
+      idImageUrl: c.idImageUrl || c.id_image_url || '',
+    };
+  });
+  callback(mapped);
+};
   const errorHandler = (error: unknown) => {
     console.error('RTDB customers subscription error', error);
     if (onError) onError(error);

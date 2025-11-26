@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LoadingSpinner from '../../src/components/LoadingSpinner';
 import { fetchCustomerById } from '../../src/utils/rtdbService';
@@ -46,6 +46,12 @@ const CustomerDetailScreen = () => {
         <InfoRow label="Vehicle Number" value={customer.vehicleNumber} />
         <InfoRow label="ID Type" value={customer.id_type} />
         <InfoRow label="ID Number" value={customer.id_number} />
+        {customer.idImageUrl ? (
+          <View style={styles.imageWrapper}>
+            <Text style={styles.imageLabel}>ID Image</Text>
+            <Image source={{ uri: customer.idImageUrl }} style={styles.idImage} />
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -95,6 +101,20 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageWrapper: {
+    marginTop: 12,
+    gap: 6,
+  },
+  imageLabel: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  idImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    backgroundColor: '#e5e7eb',
   },
 });
 

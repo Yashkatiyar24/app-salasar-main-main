@@ -26,6 +26,7 @@ type CustomerListItem = {
   vehicleNumber?: string;
   createdAt?: number;
   checkInDate?: string;
+  idImageUrl?: string;
 };
 
 type SortMode = 'recent' | 'month';
@@ -223,6 +224,14 @@ const CustomersScreen = () => {
           </View>
         }
       />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/' as any)}
+        accessibilityLabel="Go to dashboard"
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -357,6 +366,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 6,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#dc2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
   },
 });
 
