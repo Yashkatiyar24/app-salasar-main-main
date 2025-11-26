@@ -112,9 +112,10 @@ const styles = StyleSheet.create({
   },
   idImage: {
     width: '100%',
-    height: 200,
+    height: 220,
     borderRadius: 10,
     backgroundColor: '#e5e7eb',
+    resizeMode: 'contain',
   },
 });
 

@@ -166,11 +166,15 @@ const NewBookingScreen: React.FC = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.7,
-        base64: false,
+        base64: true, // store a portable preview in RTDB
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        setIdImageUrl(asset.uri);
+        if (asset.base64) {
+          setIdImageUrl(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
+        } else if (asset.uri) {
+          setIdImageUrl(asset.uri);
+        }
       }
     } catch (err) {
       console.error('Image pick error', err);
@@ -584,6 +588,8 @@ const styles = StyleSheet.create({
     height: 140,
     width: '100%',
     borderRadius: 8,
+    resizeMode: 'contain',
+    backgroundColor: '#f3f4f6',
   },
   roomsGrid: {
     flexDirection: 'row',
