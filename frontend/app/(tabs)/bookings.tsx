@@ -47,6 +47,8 @@ const BookingsScreen = () => {
         const normalizedStatus = normalizeBookingStatus(booking.status);
         const roomAvailable = roomData?.is_available !== false && !roomData?.current_booking_id;
 
+        const amountVal = customer?.city || customer?.amount || '';
+        const parsedAmount = Number(amountVal) || 0;
         return {
           id,
           customer_id: booking.customerId || '',
@@ -54,7 +56,7 @@ const BookingsScreen = () => {
           check_in: booking.checkInDate,
           check_out_expected: booking.checkOutDate || booking.checkoutDate,
           status: normalizedStatus,
-          total_amount: 0,
+          total_amount: parsedAmount,
           created_by: '',
           created_at: booking.createdAt ? new Date(booking.createdAt).toISOString() : '',
           customer: customer

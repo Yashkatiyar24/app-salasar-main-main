@@ -27,9 +27,6 @@ const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
         <Text style={styles.dateText}>Check-in: {formatDate(booking.check_in)}</Text>
         <Text style={styles.dateText}>Check-out: {formatDate(booking.check_out_expected)}</Text>
       </View>
-      {booking.total_amount > 0 && (
-        <Text style={styles.amount}>₹{booking.total_amount.toFixed(2)}</Text>
-      )}
     </TouchableOpacity>
   );
 };
@@ -69,12 +66,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
     marginBottom: 4,
-  },
-  amount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#059669',
-    marginTop: 4,
   },
 });
 

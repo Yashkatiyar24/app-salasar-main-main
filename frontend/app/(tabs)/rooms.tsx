@@ -120,7 +120,7 @@ const RoomsScreen = () => {
         renderItem={({ item }) => (
           <RoomCard
             room={mapRtdbRoomToRoomCard(item)}
-            onPress={() => router.push('/dashboard' as any)}
+            onPress={() => {}}
           />
         )}
         keyExtractor={(item) => item.key}

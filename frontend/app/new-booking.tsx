@@ -13,6 +13,7 @@ import {
   Image,
   Pressable,
 } from 'react-native';
+import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -24,6 +25,7 @@ import {
   subscribeAvailableRooms,
   RtdbRoom,
 } from '../src/utils/rtdbService';
+import { db } from '../src/firebase/firebase';
 import { defaultRoomSeeds } from '../src/utils/defaultRooms';
 import { TOTAL_ROOMS } from '../src/utils/roomConstants';
 import * as ImagePicker from 'expo-image-picker';
@@ -42,7 +44,7 @@ const NewBookingScreen: React.FC = () => {
   const [membersCount, setMembersCount] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
+  const [amount, setAmount] = useState('');
 
   // ID Proof
   const [idNumber, setIdNumber] = useState('');
@@ -55,6 +57,7 @@ const NewBookingScreen: React.FC = () => {
   const [checkOutDate, setCheckOutDate] = useState<Date | null>(
     new Date(Date.now() + 24 * 60 * 60 * 1000)
   );
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showCheckInPicker, setShowCheckInPicker] = useState(false);
   const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<RtdbRoom | null>(null);
@@ -64,6 +67,8 @@ const NewBookingScreen: React.FC = () => {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [rooms, setRooms] = useState<RtdbRoom[]>([]);
   const [roomsErrorShown, setRoomsErrorShown] = useState(false);
+  const [unavailableRooms, setUnavailableRooms] = useState<Set<number>>(new Set());
+  const excludedRooms = useMemo(() => new Set([1, 107, 108, 109, 110]), []);
 
   const fallbackRooms = useMemo(
     () =>
@@ -79,7 +84,7 @@ const NewBookingScreen: React.FC = () => {
           is_available: seed.status ? seed.status === 'AVAILABLE' : true,
           current_booking_id: seed.current_booking_id ?? null,
         }))
-        .filter((room) => room.is_available)
+        .filter((room) => ![1, 107, 108, 109, 110].includes(room.room_no))
         .sort((a, b) => a.room_no - b.room_no),
     []
   );
@@ -87,17 +92,17 @@ const NewBookingScreen: React.FC = () => {
   const buildAvailableList = (liveRooms: RtdbRoom[]) => {
     const seedMap = new Map<number, RtdbRoom>();
     fallbackRooms.forEach((seed) => {
-      seedMap.set(seed.room_no, seed);
+      if (!excludedRooms.has(seed.room_no)) seedMap.set(seed.room_no, seed);
     });
     liveRooms.forEach((room) => {
-      seedMap.set(room.room_no, {
-        ...room,
-        is_available: room.is_available !== false,
-      });
+      if (!excludedRooms.has(room.room_no)) {
+        seedMap.set(room.room_no, {
+          ...room,
+          is_available: room.is_available !== false,
+        });
+      }
     });
-    return Array.from(seedMap.values())
-      .filter((r) => r.is_available !== false && !r.current_booking_id)
-      .sort((a, b) => a.room_no - b.room_no);
+    return Array.from(seedMap.values()).sort((a, b) => a.room_no - b.room_no);
   };
 
   const resetForm = () => {
@@ -107,12 +112,13 @@ const NewBookingScreen: React.FC = () => {
     setMembersCount('');
     setVehicleNumber('');
     setAddress('');
-    setCity('');
+    setAmount('');
     setIdNumber('');
     setIdImageUrl('');
     setIdImageUrls([]);
     setCheckInDate(null);
     setCheckOutDate(null);
+    setSelectedDate(null);
     setSelectedRoom(null);
   };
 
@@ -148,6 +154,86 @@ const NewBookingScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!selectedDate) {
+      setUnavailableRooms(new Set());
+      return;
+    }
+
+    let isActive = true;
+    const fetchBookingsForDate = async () => {
+      try {
+        const { start, end } = getDayBounds(selectedDate);
+        const bookingsRef = collection(db, 'bookings');
+        const bookingsQuery = query(
+          bookingsRef,
+          where('check_in', '<=', Timestamp.fromDate(end)),
+          where('check_out', '>=', Timestamp.fromDate(start))
+        );
+
+        let snapshot = await getDocs(bookingsQuery);
+        // Fallback for schemas using string dates that cannot be queried with Timestamp
+        if (snapshot.empty) {
+          snapshot = await getDocs(bookingsRef);
+        }
+        const occupied = new Set<number>();
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          const status = (data?.status ?? '').toString().toLowerCase();
+          if (status === 'checked_out' || status === 'checkedout') return;
+
+          const roomNoRaw = data?.room_no ?? data?.roomNo;
+          const roomNo = typeof roomNoRaw === 'number' ? roomNoRaw : Number(roomNoRaw);
+          if (!roomNo) return;
+
+          const bookingCheckIn = normalizeToDate(data?.check_in ?? data?.checkIn);
+          const bookingCheckOut = normalizeToDate(data?.check_out ?? data?.checkOut);
+          if (!bookingCheckIn || !bookingCheckOut) return;
+
+          const overlaps =
+            bookingCheckIn.getTime() <= end.getTime() && bookingCheckOut.getTime() >= start.getTime();
+          if (overlaps) {
+            occupied.add(Number(roomNo));
+          }
+        });
+
+        // Always union with RTDB room flags so occupied rooms show even if Firestore lacks bookings.
+        rooms.forEach((room) => {
+          if (room.is_available === false || room.current_booking_id) {
+            occupied.add(room.room_no);
+          }
+        });
+
+        if (isActive) setUnavailableRooms(occupied);
+      } catch (err) {
+        // Fall back to RTDB room states so occupied rooms (current_booking_id / unavailable flag)
+        // still render as blocked even when Firestore denies reads (permissions/offline).
+        console.warn('Unable to load bookings for date; falling back to room availability snapshot.', err);
+        const fallbackOccupied = new Set<number>();
+        rooms.forEach((room) => {
+          if (room.is_available === false || room.current_booking_id) {
+            fallbackOccupied.add(room.room_no);
+          }
+        });
+        if (isActive) setUnavailableRooms(fallbackOccupied);
+      }
+    };
+
+    fetchBookingsForDate();
+    return () => {
+      isActive = false;
+    };
+  }, [selectedDate, rooms]);
+
+  useEffect(() => {
+    setSelectedRoom((current) => {
+      if (current && !isRoomUnavailable(current)) return current;
+      const nextAvailable = rooms.find((room) => !isRoomUnavailable(room));
+      return nextAvailable ?? null;
+    });
+  }, [rooms, unavailableRooms]);
+
   // Helpers & web input refs for web date popup support
   const checkInInputRef = React.useRef<any>(null);
   const checkOutInputRef = React.useRef<any>(null);
@@ -155,6 +241,33 @@ const NewBookingScreen: React.FC = () => {
   const toDateInputValue = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const normalizeToDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value instanceof Timestamp) return value.toDate();
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return null;
+  };
+
+  const getDayBounds = (date: Date) => {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  };
+
+  const isRoomUnavailable = (room: RtdbRoom) => {
+    if (unavailableRooms.has(room.room_no)) return true;
+    if (room.is_available === false) return true;
+    if (room.current_booking_id) return true;
+    return false;
   };
 
   const openWebDateInput = (ref: React.RefObject<any>) => {
@@ -313,7 +426,7 @@ const NewBookingScreen: React.FC = () => {
         fatherName: fatherName.trim() || undefined,
         mobileNumber: mobileNumber.trim(),
         address: address.trim() || undefined,
-        city: city.trim() || undefined,
+        city: amount.trim() || undefined,
         idNumber: idNumber.trim(),
         idImageUrl: idImageUrl.trim() || undefined,
         membersCount: members,
@@ -356,6 +469,7 @@ const NewBookingScreen: React.FC = () => {
       Alert.alert('Invalid Date', 'Check-in cannot be after the current check-out date.');
       return;
     }
+    setSelectedDate(date);
     setCheckInDate(date);
     if (!checkOutDate) {
       setCheckOutDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
@@ -384,9 +498,11 @@ const NewBookingScreen: React.FC = () => {
     if (checkOutDate && d > checkOutDate) {
       setCheckInDate(d);
       setCheckOutDate(new Date(d.getTime() + 24 * 60 * 60 * 1000));
+      setSelectedDate(d);
       window.alert('Selected check-in is after current check-out. Check-out moved to next day.');
     } else {
       setCheckInDate(d);
+      setSelectedDate(d);
       if (!checkOutDate) setCheckOutDate(new Date(d.getTime() + 24 * 60 * 60 * 1000));
     }
   };
@@ -404,6 +520,11 @@ const NewBookingScreen: React.FC = () => {
       return;
     }
     setCheckOutDate(d);
+  };
+
+  const handleSelectRoom = (room: RtdbRoom) => {
+    if (isRoomUnavailable(room)) return;
+    setSelectedRoom(room);
   };
 
   return (
@@ -462,10 +583,11 @@ const NewBookingScreen: React.FC = () => {
         />
         <TextInput
           style={styles.input}
-          placeholder="City"
+          placeholder="Amount"
           placeholderTextColor={placeholderColor}
-          value={city}
-          onChangeText={setCity}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="numeric"
         />
 
         <Text style={styles.sectionTitle}>ID Proof</Text>
@@ -593,18 +715,43 @@ const NewBookingScreen: React.FC = () => {
         ) : (
           <View style={styles.roomsGrid}>
             {rooms.map((room) => {
-              const isSelected = selectedRoom?.key === room.key;
+              const isUnavailable = isRoomUnavailable(room);
+              const isSelected = !isUnavailable && selectedRoom?.key === room.key;
               return (
                 <TouchableOpacity
                   key={room.key}
-                  style={[styles.roomCard, isSelected && styles.roomCardSelected]}
-                  onPress={() => setSelectedRoom(room)}
+                  style={[
+                    styles.roomCard,
+                    isUnavailable ? styles.roomCardUnavailable : undefined,
+                    isSelected ? styles.roomCardSelected : undefined,
+                  ]}
+                  onPress={() => handleSelectRoom(room)}
+                  disabled={isUnavailable}
                 >
+                  {isUnavailable ? (
+                    <View style={styles.unavailableBadge}>
+                      <Text style={styles.unavailableBadgeText}>Booked</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.roomInfo}>
-                    <Text style={styles.roomNumber}>
+                    <Text
+                      style={[
+                        styles.roomNumber,
+                        isUnavailable ? styles.roomTextUnavailable : undefined,
+                      ]}
+                    >
                       Room {room.room_no} – {room.type} – {room.beds} bed{room.beds === 1 ? '' : 's'}
                     </Text>
-                    {room.remarks ? <Text style={styles.roomRemarks}>{room.remarks}</Text> : null}
+                    {room.remarks ? (
+                      <Text
+                        style={[
+                          styles.roomRemarks,
+                          isUnavailable ? styles.roomTextUnavailable : undefined,
+                        ]}
+                      >
+                        {room.remarks}
+                      </Text>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -768,6 +915,11 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#fff',
     marginTop: 12,
+    position: 'relative',
+  },
+  roomCardUnavailable: {
+    backgroundColor: '#e5e7eb',
+    borderColor: '#9ca3af',
   },
   roomCardSelected: {
     borderColor: '#10b981',
@@ -780,6 +932,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  roomTextUnavailable: {
+    color: '#4b5563',
+  },
+  unavailableBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  unavailableBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   roomType: {
     fontSize: 14,
