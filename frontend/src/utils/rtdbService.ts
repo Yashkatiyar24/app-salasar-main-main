@@ -513,33 +513,52 @@ export const handleCheckout = async (bookingId: string) => {
   const bookingSnap = await get(bookingRef);
   if (!bookingSnap.exists()) throw new Error('Booking not found');
   const bookingVal = bookingSnap.val() as any;
+  const customerId = bookingVal.customerId;
 
-  const roomsSnap = await get(ref(rtdb, 'rooms'));
+  // Load all bookings + rooms once
+  const [bookingsSnap, roomsSnap] = await Promise.all([
+    get(ref(rtdb, 'bookings')),
+    get(ref(rtdb, 'rooms')),
+  ]);
   const roomsVal = roomsSnap.val() || {};
-  const { roomKey } = await ensureRoomExists(bookingVal.roomNo, roomsVal);
+  const allBookings = bookingsSnap.val() || {};
 
   const nowIso = new Date().toISOString();
-  const checkoutDate = bookingVal.checkOutDate || bookingVal.checkoutDate || nowIso;
 
-  await update(bookingRef, {
-    status: 'checked_out',
-    checkOutActual: nowIso,
-    checkOutDate: checkoutDate,
-    checkoutDate,
-    updatedAt: Date.now(),
-  });
+  const toCheckout: Array<{ id: string; val: any }> = [];
+  for (const [id, val] of Object.entries<any>(allBookings)) {
+    if (customerId && val?.customerId !== customerId) continue;
+    const status = normalizeBookingStatus(val?.status);
+    if (status === 'CHECKED_OUT') continue;
+    toCheckout.push({ id, val });
+  }
 
-  const roomRef = ref(rtdb, `rooms/${roomKey}`);
-  await runTransaction(roomRef, (room) => {
-    if (!room) return room;
-    return {
-      ...room,
-      is_available: true,
-      status: 'available',
-      current_booking_id: null,
+  // Checkout each booking and free its room
+  for (const entry of toCheckout) {
+    const bVal = entry.val;
+    const checkoutDate = bVal.checkOutDate || bVal.checkoutDate || nowIso;
+    const bRef = ref(rtdb, `bookings/${entry.id}`);
+    await update(bRef, {
+      status: 'checked_out',
+      checkOutActual: nowIso,
+      checkOutDate: checkoutDate,
+      checkoutDate,
       updatedAt: Date.now(),
-    };
-  });
+    });
+
+    const { roomKey } = await ensureRoomExists(bVal.roomNo, roomsVal);
+    const roomRef = ref(rtdb, `rooms/${roomKey}`);
+    await runTransaction(roomRef, (room) => {
+      if (!room) return room;
+      return {
+        ...room,
+        is_available: true,
+        status: 'available',
+        current_booking_id: null,
+        updatedAt: Date.now(),
+      };
+    });
+  }
 };
 
 // alias for existing callers

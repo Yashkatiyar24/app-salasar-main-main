@@ -312,8 +312,7 @@ const NewBookingScreen: React.FC = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
         base64: true,
-        allowsEditing: true,
-        aspect: [4, 5],
+        allowsEditing: true, // freeform crop
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
@@ -342,8 +341,7 @@ const NewBookingScreen: React.FC = () => {
         base64: true,
         allowsMultipleSelection: true,
         selectionLimit: 5,
-        allowsEditing: true,
-        aspect: [4, 5],
+        allowsEditing: true, // freeform crop
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const newUris: string[] = [];
@@ -616,24 +614,25 @@ const NewBookingScreen: React.FC = () => {
             value={address}
             onChangeText={setAddress}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Amount"
-            placeholderTextColor={placeholderColor}
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-          />
+        <TextInput
+          style={styles.input}
+          placeholder="Amount"
+          placeholderTextColor={placeholderColor}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="default"
+        />
 
           <Text style={styles.sectionTitle}>ID Proof</Text>
           <TextInput style={styles.input} value="Aadhaar" editable={false} />
           <TextInput
             style={styles.input}
-            placeholder="ID Number *"
-            placeholderTextColor={placeholderColor}
-            value={idNumber}
-            onChangeText={setIdNumber}
-          />
+          placeholder="ID Number *"
+          placeholderTextColor={placeholderColor}
+          value={idNumber}
+          onChangeText={setIdNumber}
+          keyboardType="numeric"
+        />
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}

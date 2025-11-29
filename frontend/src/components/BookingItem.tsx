@@ -9,9 +9,32 @@ interface BookingItemProps {
 }
 
 const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const normalizeToDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value?.toDate) {
+      try {
+        return value.toDate();
+      } catch {}
+    }
+    if (typeof value === 'string') {
+      const d = new Date(value);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    return null;
+  };
+
+  const formatDateTime = (value: any) => {
+    const d = normalizeToDate(value);
+    if (!d) return 'N/A';
+    return d.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   const roomLabel =
@@ -29,8 +52,8 @@ const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
         <StatusBadge status={booking.status} small />
       </View>
       <View style={styles.dates}>
-        <Text style={styles.dateText}>Check-in: {formatDate(booking.check_in)}</Text>
-        <Text style={styles.dateText}>Check-out: {formatDate(booking.check_out_expected)}</Text>
+        <Text style={styles.dateText}>Check-in: {formatDateTime(booking.check_in)}</Text>
+        <Text style={styles.dateText}>Check-out: {formatDateTime(booking.check_out_expected)}</Text>
       </View>
     </TouchableOpacity>
   );

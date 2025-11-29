@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   FlatList,
   TextInput,
   RefreshControl,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { get, ref } from 'firebase/database';
@@ -24,6 +26,7 @@ const BookingsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('recent');
 
   const fetchBookings = async () => {
     try {
@@ -55,6 +58,7 @@ const BookingsScreen = () => {
           room_id: roomKey || booking.roomNo || '',
           check_in: booking.checkInDate,
           check_out_expected: booking.checkOutDate || booking.checkoutDate,
+          check_out_actual: booking.checkOutActual || booking.checkoutDate,
           status: normalizedStatus,
           total_amount: parsedAmount,
           created_by: '',
@@ -122,20 +126,75 @@ const BookingsScreen = () => {
     }, [])
   );
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredBookings(bookings);
-      return;
+  const normalizeToDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value.toDate) {
+      try {
+        return value.toDate();
+      } catch {}
     }
+    if (typeof value === 'string') {
+      const d = new Date(value);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    return null;
+  };
 
-    const query = searchQuery.toLowerCase();
-    const filtered = bookings.filter(
-      (booking) =>
-        booking.customer?.name.toLowerCase().includes(query) ||
-        booking.room?.room_number.toLowerCase().includes(query)
-    );
+  const filterBySearch = useCallback(
+    (list: Booking[]) => {
+      if (!searchQuery.trim()) return list;
+      const query = searchQuery.toLowerCase();
+      return list.filter(
+        (booking) =>
+          booking.customer?.name?.toLowerCase().includes(query) ||
+          booking.room_numbers?.some((rn) => rn.toLowerCase().includes(query)) ||
+          booking.room?.room_number?.toLowerCase().includes(query)
+      );
+    },
+    [searchQuery]
+  );
+
+  const filterByMonth = useCallback(
+    (list: Booking[]) => {
+      if (selectedMonth === 'recent') return list;
+      const [month, year] = selectedMonth.split('-').map((v) => Number(v));
+      return list.filter((booking) => {
+        const d =
+          normalizeToDate((booking as any).check_in) ||
+          normalizeToDate((booking as any).checkInDate) ||
+          normalizeToDate(booking.created_at);
+        if (!d) return false;
+        return d.getMonth() + 1 === month && d.getFullYear() === year;
+      });
+    },
+    [selectedMonth]
+  );
+
+  useEffect(() => {
+    const base = filterByMonth(bookings);
+    const filtered = filterBySearch(base);
     setFilteredBookings(filtered);
-  }, [searchQuery, bookings]);
+  }, [bookings, filterByMonth, filterBySearch]);
+
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    bookings.forEach((b) => {
+      const d =
+        normalizeToDate((b as any).check_in) ||
+        normalizeToDate((b as any).checkInDate) ||
+        normalizeToDate(b.created_at);
+      if (!d) return;
+      const key = `${d.getMonth() + 1}-${d.getFullYear()}`;
+      months.add(key);
+    });
+    return Array.from(months.values()).sort((a, b) => {
+      const [ma, ya] = a.split('-').map(Number);
+      const [mb, yb] = b.split('-').map(Number);
+      if (ya === yb) return mb - ma; // descending month
+      return yb - ya; // descending year
+    });
+  }, [bookings]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -148,6 +207,38 @@ const BookingsScreen = () => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterChip, selectedMonth === 'recent' && styles.filterChipActive]}
+          onPress={() => setSelectedMonth('recent')}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              selectedMonth === 'recent' && styles.filterChipTextActive,
+            ]}
+          >
+            Recently added
+          </Text>
+        </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {monthOptions.map((key) => {
+            const [m, y] = key.split('-').map(Number);
+            const label = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            const active = selectedMonth === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setSelectedMonth(key)}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
@@ -221,6 +312,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9ca3af',
     marginTop: 16,
+  },
+  filterRow: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+  },
+  filterChipActive: {
+    backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
+  },
+  filterChipText: {
+    color: '#4b5563',
+    fontSize: 14,
+  },
+  filterChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
 
