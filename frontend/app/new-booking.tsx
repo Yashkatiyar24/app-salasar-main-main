@@ -13,7 +13,7 @@ import {
   Image,
   Pressable,
 } from 'react-native';
-import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import { collection, getDocs, query, Timestamp, where, onSnapshot } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -25,9 +25,10 @@ import {
   subscribeAvailableRooms,
   RtdbRoom,
 } from '../src/utils/rtdbService';
-import { db } from '../src/firebase/firebase';
+import { db, rtdb } from '../src/firebase/firebase';
 import { defaultRoomSeeds } from '../src/utils/defaultRooms';
 import { TOTAL_ROOMS } from '../src/utils/roomConstants';
+import { get, ref as rtdbRef } from 'firebase/database';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
@@ -69,6 +70,17 @@ const NewBookingScreen: React.FC = () => {
   const [roomsErrorShown, setRoomsErrorShown] = useState(false);
   const [unavailableRooms, setUnavailableRooms] = useState<Set<number>>(new Set());
   const excludedRooms = useMemo(() => new Set([1, 107, 108, 109, 110]), []);
+
+  // Helper to determine if a room is unavailable. Reused for styling and handlers.
+  const isRoomUnavailable = (roomNo: number, room?: RtdbRoom) => {
+    // Firestore-derived occupancy state for the selected date
+    if (unavailableRooms.has(roomNo)) return true;
+    // RTDB-provided flags
+    if (room?.is_available === false) return true;
+    if (room?.status && room.status.toString().toLowerCase() === 'occupied') return true;
+    if (room?.current_booking_id) return true;
+    return false;
+  };
 
   const fallbackRooms = useMemo(
     () =>
@@ -154,95 +166,6 @@ const NewBookingScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!selectedDate) {
-      setUnavailableRooms(new Set());
-      return;
-    }
-
-    let isActive = true;
-    const fetchBookingsForDate = async () => {
-      try {
-        const { start, end } = getDayBounds(selectedDate);
-        const bookingsRef = collection(db, 'bookings');
-        const bookingsQuery = query(
-          bookingsRef,
-          where('check_in', '<=', Timestamp.fromDate(end)),
-          where('check_out', '>=', Timestamp.fromDate(start))
-        );
-
-        let snapshot = await getDocs(bookingsQuery);
-        // Fallback for schemas using string dates that cannot be queried with Timestamp
-        if (snapshot.empty) {
-          snapshot = await getDocs(bookingsRef);
-        }
-        const occupied = new Set<number>();
-
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          const status = (data?.status ?? '').toString().toLowerCase();
-          if (status === 'checked_out' || status === 'checkedout') return;
-
-          const roomNoRaw = data?.room_no ?? data?.roomNo;
-          const roomNo = typeof roomNoRaw === 'number' ? roomNoRaw : Number(roomNoRaw);
-          if (!roomNo) return;
-
-          const bookingCheckIn = normalizeToDate(data?.check_in ?? data?.checkIn);
-          const bookingCheckOut = normalizeToDate(data?.check_out ?? data?.checkOut);
-          if (!bookingCheckIn || !bookingCheckOut) return;
-
-          const overlaps =
-            bookingCheckIn.getTime() <= end.getTime() && bookingCheckOut.getTime() >= start.getTime();
-          if (overlaps) {
-            occupied.add(Number(roomNo));
-          }
-        });
-
-        // Always union with RTDB room flags so occupied rooms show even if Firestore lacks bookings.
-        rooms.forEach((room) => {
-          if (room.is_available === false || room.current_booking_id) {
-            occupied.add(room.room_no);
-          }
-        });
-
-        if (isActive) setUnavailableRooms(occupied);
-      } catch (err) {
-        // Fall back to RTDB room states so occupied rooms (current_booking_id / unavailable flag)
-        // still render as blocked even when Firestore denies reads (permissions/offline).
-        console.warn('Unable to load bookings for date; falling back to room availability snapshot.', err);
-        const fallbackOccupied = new Set<number>();
-        rooms.forEach((room) => {
-          if (room.is_available === false || room.current_booking_id) {
-            fallbackOccupied.add(room.room_no);
-          }
-        });
-        if (isActive) setUnavailableRooms(fallbackOccupied);
-      }
-    };
-
-    fetchBookingsForDate();
-    return () => {
-      isActive = false;
-    };
-  }, [selectedDate, rooms]);
-
-  useEffect(() => {
-    setSelectedRoom((current) => {
-      if (current && !isRoomUnavailable(current)) return current;
-      const nextAvailable = rooms.find((room) => !isRoomUnavailable(room));
-      return nextAvailable ?? null;
-    });
-  }, [rooms, unavailableRooms]);
-
-  // Helpers & web input refs for web date popup support
-  const checkInInputRef = React.useRef<any>(null);
-  const checkOutInputRef = React.useRef<any>(null);
-
-  const toDateInputValue = (d: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-
   const normalizeToDate = (value: any): Date | null => {
     if (!value) return null;
     if (value instanceof Date) return value;
@@ -263,11 +186,108 @@ const NewBookingScreen: React.FC = () => {
     return { start, end };
   };
 
-  const isRoomUnavailable = (room: RtdbRoom) => {
-    if (unavailableRooms.has(room.room_no)) return true;
-    if (room.is_available === false) return true;
-    if (room.current_booking_id) return true;
-    return false;
+  // 🔥 LIVE PREDICTION GREY-OUT BASED ON CHECK-IN & CHECK-OUT
+  useEffect(() => {
+    if (!checkInDate || !checkOutDate) {
+      // Reset if no dates yet
+      setUnavailableRooms(new Set());
+      return;
+    }
+
+    const start = new Date(checkInDate);
+    const end = new Date(checkOutDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    const bookingsRef = collection(db, 'bookings');
+    const bookingsQuery = query(
+      bookingsRef,
+      where('check_in', '<=', Timestamp.fromDate(end)),
+      where('check_out', '>=', Timestamp.fromDate(start))
+    );
+
+    const mergeFromRtdbBookings = async (existing: Set<number>) => {
+      try {
+        const snap = await get(rtdbRef(rtdb, 'bookings'));
+        const val = snap.val() || {};
+        Object.values<any>(val).forEach((b: any) => {
+          const status = (b?.status ?? '').toString().toLowerCase();
+          if (status === 'checked_out' || status === 'checkedout') return;
+          const roomNoRaw = b?.room_no ?? b?.roomNo;
+          const roomNo = typeof roomNoRaw === 'number' ? roomNoRaw : Number(roomNoRaw);
+          if (!roomNo) return;
+          const bookingCheckIn = normalizeToDate(b?.checkInDate ?? b?.check_in ?? b?.checkIn);
+          const bookingCheckOut = normalizeToDate(
+            b?.checkOutDate ?? b?.check_out ?? b?.checkOut ?? b?.checkoutDate
+          );
+          if (!bookingCheckIn || !bookingCheckOut) return;
+          const overlaps =
+            bookingCheckIn.getTime() <= end.getTime() && bookingCheckOut.getTime() >= start.getTime();
+          if (overlaps) existing.add(Number(roomNo));
+        });
+      } catch (err) {
+        console.warn('RTDB bookings read failed; continuing with Firestore data.', err);
+      }
+      return existing;
+    };
+
+    const applyUnavailable = async (occupied: Set<number>) => {
+      // Merge RTDB room flags (occupied/current_booking_id)
+      rooms.forEach((room) => {
+        if (room.is_available === false || room.current_booking_id) {
+          occupied.add(room.room_no);
+        }
+      });
+      setUnavailableRooms(occupied);
+    };
+
+    const unsub = onSnapshot(
+      bookingsQuery,
+      async (snap) => {
+        const occupied = new Set<number>();
+
+        snap.forEach((doc) => {
+          const data = doc.data();
+          if (!data) return;
+
+          const status = (data.status ?? '').toString().toLowerCase();
+          if (status === 'checked_out') return;
+
+          const roomNo = Number(data.room_no ?? data.roomNo);
+          if (!roomNo) return;
+
+          occupied.add(roomNo);
+        });
+
+        const merged = await mergeFromRtdbBookings(occupied);
+        applyUnavailable(merged);
+      },
+      async (error) => {
+        console.warn('Firestore bookings subscription failed; falling back to RTDB.', error);
+        const occupied = await mergeFromRtdbBookings(new Set<number>());
+        applyUnavailable(occupied);
+      }
+    );
+
+    return () => unsub();
+  }, [checkInDate, checkOutDate, rooms]);
+
+  useEffect(() => {
+    // Auto-adjust selected room if it becomes unavailable
+    setSelectedRoom((current) => {
+      if (current && !isRoomUnavailable(current.room_no, current)) return current;
+      const nextAvailable = rooms.find((room) => !isRoomUnavailable(room.room_no, room));
+      return nextAvailable ?? null;
+    });
+  }, [rooms, unavailableRooms]);
+
+  // Helpers & web input refs for web date popup support
+  const checkInInputRef = React.useRef<any>(null);
+  const checkOutInputRef = React.useRef<any>(null);
+
+  const toDateInputValue = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
 
   const openWebDateInput = (ref: React.RefObject<any>) => {
@@ -352,7 +372,7 @@ const NewBookingScreen: React.FC = () => {
     }
     if (asset.uri) {
       try {
-        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
         return `data:${mime};base64,${base64}`;
       } catch (e) {
         console.warn('Failed to read image as base64', e);
@@ -394,8 +414,9 @@ const NewBookingScreen: React.FC = () => {
       Alert.alert('Missing Info', 'Please select an available room');
       return false;
     }
-    if (!selectedRoom.is_available) {
-      Alert.alert('Room occupied', 'Please pick a room that is marked available.');
+    // Use unified availability check (RTDB + Firestore)
+    if (isRoomUnavailable(selectedRoom.room_no, selectedRoom)) {
+      Alert.alert('Room occupied', 'This room is already booked. Please pick another room.');
       return false;
     }
 
@@ -428,7 +449,6 @@ const NewBookingScreen: React.FC = () => {
         address: address.trim() || undefined,
         city: amount.trim() || undefined,
         idNumber: idNumber.trim(),
-        idImageUrl: idImageUrl.trim() || undefined,
         membersCount: members,
         vehicleNumber: vehicleNumber.trim() || undefined,
         checkInDate: checkInDate.toISOString(),
@@ -437,7 +457,6 @@ const NewBookingScreen: React.FC = () => {
         idImageUrls,
         idImageUrl: idImageUrls[0] ?? idImageUrl ?? undefined,
       });
-
 
       const bookingId = await createBooking(
         customerId,
@@ -523,7 +542,7 @@ const NewBookingScreen: React.FC = () => {
   };
 
   const handleSelectRoom = (room: RtdbRoom) => {
-    if (isRoomUnavailable(room)) return;
+    if (isRoomUnavailable(room.room_no, room)) return;
     setSelectedRoom(room);
   };
 
@@ -534,254 +553,246 @@ const NewBookingScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>New Booking / Check-in</Text>
+          <Text style={styles.title}>New Booking / Check-in</Text>
 
-        <Text style={styles.sectionTitle}>Guest Details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Guest Name *"
-          placeholderTextColor={placeholderColor}
-          value={guestName}
-          onChangeText={setGuestName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Father's Name"
-          placeholderTextColor={placeholderColor}
-          value={fatherName}
-          onChangeText={setFatherName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Mobile Number *"
-          placeholderTextColor={placeholderColor}
-          value={mobileNumber}
-          onChangeText={setMobileNumber}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Number of Members *"
-          placeholderTextColor={placeholderColor}
-          value={membersCount}
-          onChangeText={setMembersCount}
-          keyboardType="number-pad"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Vehicle Number"
-          placeholderTextColor={placeholderColor}
-          value={vehicleNumber}
-          onChangeText={setVehicleNumber}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Address"
-          placeholderTextColor={placeholderColor}
-          value={address}
-          onChangeText={setAddress}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Amount"
-          placeholderTextColor={placeholderColor}
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="numeric"
-        />
-
-        <Text style={styles.sectionTitle}>ID Proof</Text>
-        <TextInput style={styles.input} value="Aadhaar" editable={false} />
-        <TextInput
-          style={styles.input}
-          placeholder="ID Number *"
-          placeholderTextColor={placeholderColor}
-          value={idNumber}
-          onChangeText={setIdNumber}
-        />
-        <View style={styles.inputRow}>
+          <Text style={styles.sectionTitle}>Guest Details</Text>
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="ID Image URL"
+            style={styles.input}
+            placeholder="Guest Name *"
             placeholderTextColor={placeholderColor}
-            value={idImageUrl}
-            onChangeText={setIdImageUrl}
-            autoCapitalize="none"
+            value={guestName}
+            onChangeText={setGuestName}
           />
-          <TouchableOpacity style={styles.addUrlButton} onPress={addManualImageUrl}>
-            <Text style={styles.addUrlText}>Add</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Father's Name"
+            placeholderTextColor={placeholderColor}
+            value={fatherName}
+            onChangeText={setFatherName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Mobile Number *"
+            placeholderTextColor={placeholderColor}
+            value={mobileNumber}
+            onChangeText={setMobileNumber}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Number of Members *"
+            placeholderTextColor={placeholderColor}
+            value={membersCount}
+            onChangeText={setMembersCount}
+            keyboardType="number-pad"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Vehicle Number"
+            placeholderTextColor={placeholderColor}
+            value={vehicleNumber}
+            onChangeText={setVehicleNumber}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Address"
+            placeholderTextColor={placeholderColor}
+            value={address}
+            onChangeText={setAddress}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Amount"
+            placeholderTextColor={placeholderColor}
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.sectionTitle}>ID Proof</Text>
+          <TextInput style={styles.input} value="Aadhaar" editable={false} />
+          <TextInput
+            style={styles.input}
+            placeholder="ID Number *"
+            placeholderTextColor={placeholderColor}
+            value={idNumber}
+            onChangeText={setIdNumber}
+          />
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="ID Image URL"
+              placeholderTextColor={placeholderColor}
+              value={idImageUrl}
+              onChangeText={setIdImageUrl}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.addUrlButton} onPress={addManualImageUrl}>
+              <Text style={styles.addUrlText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.imageRow}>
+            <TouchableOpacity style={styles.imageButton} onPress={pickIdImage}>
+              <Ionicons name="camera" size={18} color="#fff" />
+              <Text style={styles.imageButtonText}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.imageButtonSecondary} onPress={pickIdImagesFromLibrary}>
+              <Ionicons name="images" size={18} color="#dc2626" />
+              <Text style={styles.imageButtonTextSecondary}>Gallery</Text>
+            </TouchableOpacity>
+            {idImageUrls.length > 0 && (
+              <Pressable
+                onPress={() => {
+                  setIdImageUrls([]);
+                  setIdImageUrl('');
+                }}
+                style={styles.clearImageButton}
+              >
+                <Text style={styles.clearImageText}>Clear</Text>
+              </Pressable>
+            )}
+          </View>
+          {idImageUrls.length > 0 ? (
+            <View style={styles.previewList}>
+              {idImageUrls.map((uri, idx) => (
+                <View key={idx} style={styles.previewItem}>
+                  <Image source={{ uri }} style={styles.previewImage} />
+                  <Pressable style={styles.removeThumb} onPress={() => removeImageAt(idx)}>
+                    <Ionicons name="close" size={16} color="#fff" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>Booking Details</Text>
+
+          {/* Check-in Date Picker */}
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                openWebDateInput(checkInInputRef);
+              } else {
+                setShowCheckInPicker(true);
+              }
+            }}
+          >
+            <Text style={styles.inputText}>
+              {checkInDate ? formatDate(checkInDate) : 'Select check-in date *'}
+            </Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.imageRow}>
-          <TouchableOpacity style={styles.imageButton} onPress={pickIdImage}>
-            <Ionicons name="camera" size={18} color="#fff" />
-            <Text style={styles.imageButtonText}>Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.imageButtonSecondary} onPress={pickIdImagesFromLibrary}>
-            <Ionicons name="images" size={18} color="#dc2626" />
-            <Text style={styles.imageButtonTextSecondary}>Gallery</Text>
-          </TouchableOpacity>
-          {idImageUrls.length > 0 && (
-            <Pressable
-              onPress={() => {
-                setIdImageUrls([]);
-                setIdImageUrl('');
-              }}
-              style={styles.clearImageButton}
-            >
-              <Text style={styles.clearImageText}>Clear</Text>
-            </Pressable>
+
+          {/* Hidden web inputs (only used on web) */}
+          {Platform.OS === 'web' && (
+            <>
+              <input
+                ref={(el) => {
+                  // @ts-ignore
+                  checkInInputRef.current = el;
+                }}
+                type="date"
+                style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
+                value={checkInDate ? toDateInputValue(checkInDate) : ''}
+                onChange={onWebCheckInChange}
+              />
+              <input
+                ref={(el) => {
+                  // @ts-ignore
+                  checkOutInputRef.current = el;
+                }}
+                type="date"
+                style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
+                value={checkOutDate ? toDateInputValue(checkOutDate) : ''}
+                onChange={onWebCheckOutChange}
+              />
+            </>
           )}
-        </View>
-        {idImageUrls.length > 0 ? (
-          <View style={styles.previewList}>
-            {idImageUrls.map((uri, idx) => (
-              <View key={idx} style={styles.previewItem}>
-                <Image source={{ uri }} style={styles.previewImage} />
-                <Pressable style={styles.removeThumb} onPress={() => removeImageAt(idx)}>
-                  <Ionicons name="close" size={16} color="#fff" />
-                </Pressable>
-              </View>
-            ))}
+
+          {/* Check-out Date Picker */}
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                openWebDateInput(checkOutInputRef);
+              } else {
+                setShowCheckOutPicker(true);
+              }
+            }}
+          >
+            <Text style={styles.inputText}>
+              {checkOutDate ? formatDate(checkOutDate) : 'Select check-out date *'}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.sectionTitle}>Select Room</Text>
+          {loadingRooms ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color="#dc2626" />
+              <Text style={styles.loadingText}>Fetching rooms...</Text>
+            </View>
+          ) : rooms.length === 0 ? (
+            <Text style={styles.noRoomsText}>No rooms available right now.</Text>
+          ) : (
+            <View style={styles.roomsGrid}>
+  {rooms.map((room) => {
+    const isUnavailable = isRoomUnavailable(room.room_no, room);
+    const isSelected = !isUnavailable && selectedRoom?.key === room.key;
+
+    return (
+      <TouchableOpacity
+        key={room.key}
+        style={[
+          styles.roomCard,
+          isUnavailable && styles.roomCardUnavailable,
+          isSelected && styles.roomCardSelected,
+        ]}
+        onPress={() => handleSelectRoom(room)}
+        disabled={isUnavailable}
+      >
+        {isUnavailable && (
+          <View style={styles.unavailableBadge}>
+            <Text style={styles.unavailableBadgeText}>Booked</Text>
           </View>
-        ) : null}
+        )}
 
-        <Text style={styles.sectionTitle}>Booking Details</Text>
-
-        {/* Check-in Date Picker */}
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              openWebDateInput(checkInInputRef);
-            } else {
-              setShowCheckInPicker(true);
-            }
-          }}
+        <Text
+          style={[
+            styles.roomNumber,
+            isUnavailable && styles.roomTextUnavailable,
+          ]}
         >
-          <Text style={styles.inputText}>
-            {checkInDate ? formatDate(checkInDate) : 'Select check-in date *'}
-          </Text>
-        </TouchableOpacity>
+          Room {room.room_no} – {room.type} – {room.beds} beds
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</View>
+          )}
 
-        {/* Hidden web inputs (only used on web) - keep them near the visible fields */}
-        {Platform.OS === 'web' && (
-          <>
-            <input
-              ref={(el) => {
-                checkInInputRef.current = el;
-              }}
-              type="date"
-              style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
-              value={checkInDate ? toDateInputValue(checkInDate) : ''}
-              onChange={onWebCheckInChange}
+          {/* Date pickers — use fallback value when state is null */}
+          {Platform.OS !== 'web' && showCheckInPicker && (
+            <DateTimePicker
+              testID="dateTimePickerCheckIn"
+              value={checkInDate ?? new Date()}
+              mode="date"
+              display="calendar"
+              onChange={onCheckInChange}
+              maximumDate={new Date(2100, 11, 31)}
+              minimumDate={new Date(1900, 0, 1)}
             />
-            <input
-              ref={(el) => {
-                checkOutInputRef.current = el;
-              }}
-              type="date"
-              style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
-              value={checkOutDate ? toDateInputValue(checkOutDate) : ''}
-              onChange={onWebCheckOutChange}
+          )}
+          {Platform.OS !== 'web' && showCheckOutPicker && (
+            <DateTimePicker
+              testID="dateTimePickerCheckOut"
+              value={checkOutDate ?? (checkInDate ?? new Date())}
+              mode="date"
+              display="calendar"
+              onChange={onCheckOutChange}
+              maximumDate={new Date(2100, 11, 31)}
+              minimumDate={checkInDate ?? new Date(1900, 0, 1)}
             />
-          </>
-        )}
-
-        {/* Check-out Date Picker */}
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              openWebDateInput(checkOutInputRef);
-            } else {
-              setShowCheckOutPicker(true);
-            }
-          }}
-        >
-          <Text style={styles.inputText}>
-            {checkOutDate ? formatDate(checkOutDate) : 'Select check-out date *'}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Select Room</Text>
-        {loadingRooms ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color="#dc2626" />
-            <Text style={styles.loadingText}>Fetching rooms...</Text>
-          </View>
-        ) : rooms.length === 0 ? (
-          <Text style={styles.noRoomsText}>No rooms available right now.</Text>
-        ) : (
-          <View style={styles.roomsGrid}>
-            {rooms.map((room) => {
-              const isUnavailable = isRoomUnavailable(room);
-              const isSelected = !isUnavailable && selectedRoom?.key === room.key;
-              return (
-                <TouchableOpacity
-                  key={room.key}
-                  style={[
-                    styles.roomCard,
-                    isUnavailable ? styles.roomCardUnavailable : undefined,
-                    isSelected ? styles.roomCardSelected : undefined,
-                  ]}
-                  onPress={() => handleSelectRoom(room)}
-                  disabled={isUnavailable}
-                >
-                  {isUnavailable ? (
-                    <View style={styles.unavailableBadge}>
-                      <Text style={styles.unavailableBadgeText}>Booked</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.roomInfo}>
-                    <Text
-                      style={[
-                        styles.roomNumber,
-                        isUnavailable ? styles.roomTextUnavailable : undefined,
-                      ]}
-                    >
-                      Room {room.room_no} – {room.type} – {room.beds} bed{room.beds === 1 ? '' : 's'}
-                    </Text>
-                    {room.remarks ? (
-                      <Text
-                        style={[
-                          styles.roomRemarks,
-                          isUnavailable ? styles.roomTextUnavailable : undefined,
-                        ]}
-                      >
-                        {room.remarks}
-                      </Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Date pickers — use fallback value when state is null */}
-        {Platform.OS !== 'web' && showCheckInPicker && (
-          <DateTimePicker
-            testID="dateTimePickerCheckIn"
-            value={checkInDate ?? new Date()}
-            mode="date"
-            display="calendar"
-            onChange={onCheckInChange}
-            maximumDate={new Date(2100, 11, 31)}
-            minimumDate={new Date(1900, 0, 1)}
-          />
-        )}
-        {Platform.OS !== 'web' && showCheckOutPicker && (
-          <DateTimePicker
-            testID="dateTimePickerCheckOut"
-            value={checkOutDate ?? (checkInDate ?? new Date())}
-            mode="date"
-            display="calendar"
-            onChange={onCheckOutChange}
-            maximumDate={new Date(2100, 11, 31)}
-            minimumDate={checkInDate ?? new Date(1900, 0, 1)}
-          />
-        )}
+          )}
 
           <TouchableOpacity
             style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
@@ -910,45 +921,46 @@ const styles = StyleSheet.create({
   roomCard: {
     width: '48%',
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: '#fff',
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
     marginTop: 12,
     position: 'relative',
   },
   roomCardUnavailable: {
-    backgroundColor: '#e5e7eb',
-    borderColor: '#9ca3af',
+    backgroundColor: '#E5E7EB',
+    borderColor: '#9CA3AF',
   },
   roomCardSelected: {
-    borderColor: '#10b981',
-    backgroundColor: '#d1fae5',
+    borderColor: '#FBBF24',
+    backgroundColor: '#D1FAE5',
   },
   roomInfo: {
-    gap: 4,
+    justifyContent: 'center',
   },
   roomNumber: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
+    color: '#111827',
   },
   roomTextUnavailable: {
-    color: '#4b5563',
+    color: '#4B5563',
   },
   unavailableBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#ef4444',
+    right: 10,
+    bottom: 10,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#F97373',
   },
   unavailableBadgeText: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
   roomType: {
     fontSize: 14,

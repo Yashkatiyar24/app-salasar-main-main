@@ -12,7 +12,6 @@ import LoadingSpinner from '../../src/components/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { subscribeToDashboardCounts } from '../../src/utils/rtdbService';
-import { defaultRoomSeeds } from '../../src/utils/defaultRooms';
 import { TOTAL_ROOMS } from '../../src/utils/roomConstants';
 
 const DashboardScreen = () => {
@@ -29,7 +28,6 @@ const DashboardScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const fallback = () => {
-        // Use the authoritative TOTAL_ROOMS count even when RTDB isn't available.
         const total = TOTAL_ROOMS;
         setStats({
           totalRooms: total,
@@ -51,6 +49,7 @@ const DashboardScreen = () => {
           fallback();
         }
       );
+
       return () => unsubscribe();
     }, [])
   );
@@ -62,6 +61,8 @@ const DashboardScreen = () => {
   if (loading) {
     return <LoadingSpinner message="Loading dashboard..." />;
   }
+
+  const hasOccupied = stats.occupiedRoomNos && stats.occupiedRoomNos.length > 0;
 
   return (
     <ScrollView
@@ -109,14 +110,25 @@ const DashboardScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {stats.occupiedRoomNos.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Currently Occupied</Text>
-          <Text style={styles.bookingRoom}>
-            Rooms: {stats.occupiedRoomNos.sort((a, b) => a - b).join(', ')}
-          </Text>
-        </View>
-      )}
+      {/* Currently Occupied Room Chips */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Currently Occupied</Text>
+        {hasOccupied ? (
+          <View style={styles.occupiedRoomsGrid}>
+            {stats.occupiedRoomNos
+              .slice()
+              .sort((a, b) => a - b)
+              .map((roomNo) => (
+                <View key={roomNo} style={styles.occupiedRoomChip}>
+                  <Ionicons name="bed" size={14} color="#B91C1C" />
+                  <Text style={styles.occupiedRoomText}>Room {roomNo}</Text>
+                </View>
+              ))}
+          </View>
+        ) : (
+          <Text style={styles.noOccupiedText}>No rooms are currently occupied.</Text>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -197,6 +209,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   bookingRoom: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  occupiedRoomsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  occupiedRoomChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  occupiedRoomText: {
+    fontSize: 13,
+    color: '#7F1D1D',
+    fontWeight: '600',
+  },
+  noOccupiedText: {
     fontSize: 14,
     color: '#6b7280',
   },
