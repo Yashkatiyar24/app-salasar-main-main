@@ -44,7 +44,7 @@ const CustomerDetailScreen = () => {
         fatherName: customer.father_name,
         mobileNumber: customer.mobile,
         address: customer.address,
-        city: customer.city,
+        amount: customer.amount,
         membersCount: customer.membersCount ? Number(customer.membersCount) : undefined,
         vehicleNumber: customer.vehicleNumber,
         idNumber: customer.id_number,
@@ -92,7 +92,7 @@ const CustomerDetailScreen = () => {
         <InfoInput label="Name" value={customer.name} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, name: v })} />
         <InfoInput label="Father's Name" value={customer.father_name} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, father_name: v })} />
         <InfoInput label="Mobile" value={customer.mobile} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, mobile: v })} />
-        <InfoInput label="City" value={customer.city} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, city: v })} />
+        <InfoInput label="Amount" value={customer.amount} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, amount: v })} />
         <InfoInput label="Address" value={customer.address} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, address: v })} />
         <InfoInput label="Members" value={customer.membersCount} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, membersCount: v })} />
         <InfoInput label="Vehicle Number" value={customer.vehicleNumber} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, vehicleNumber: v })} />

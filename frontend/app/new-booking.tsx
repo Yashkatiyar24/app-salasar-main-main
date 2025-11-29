@@ -413,6 +413,10 @@ const NewBookingScreen: React.FC = () => {
       Alert.alert('Missing Info', 'Number of members is required');
       return false;
     }
+    if (!amount.trim()) {
+      Alert.alert('Missing Info', 'Amount is required');
+      return false;
+    }
     if (!idNumber.trim()) {
       Alert.alert('Missing Info', 'ID number is required');
       return false;
@@ -455,7 +459,8 @@ const NewBookingScreen: React.FC = () => {
         fatherName: fatherName.trim() || undefined,
         mobileNumber: mobileNumber.trim(),
         address: address.trim() || undefined,
-        city: amount.trim() || undefined,
+        city: undefined,
+        amount: amount.trim(),
         idNumber: idNumber.trim(),
         membersCount: members,
         vehicleNumber: vehicleNumber.trim() || undefined,
@@ -618,7 +623,7 @@ const NewBookingScreen: React.FC = () => {
           />
         <TextInput
           style={styles.input}
-          placeholder="Amount"
+          placeholder="Amount *"
           placeholderTextColor={placeholderColor}
           value={amount}
           onChangeText={setAmount}

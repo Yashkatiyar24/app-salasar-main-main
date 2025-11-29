@@ -33,6 +33,7 @@ export type RtdbCustomerInput = {
   vehicleNumber?: string;
   address?: string;
   city?: string;
+  amount?: string;
   idNumber: string;
   idImageUrl?: string | null;
   idImageUrls?: string[];
@@ -62,6 +63,7 @@ export const updateCustomer = async (
   maybeAssign('vehicleNumber', data.vehicleNumber);
   maybeAssign('address', data.address);
   maybeAssign('city', data.city);
+  maybeAssign('amount', data.amount);
   maybeAssign('idType', data.idImageUrl || idImages ? 'Aadhaar' : undefined);
   maybeAssign('idNumber', data.idNumber);
   maybeAssign('idImageUrl', idImages ? idImages[0] : data.idImageUrl);
@@ -78,6 +80,7 @@ export const updateCustomer = async (
   maybeAssign('vehicle_number', data.vehicleNumber);
   maybeAssign('address', data.address);
   maybeAssign('city', data.city);
+  maybeAssign('amount', data.amount);
   maybeAssign('id_number', data.idNumber);
   maybeAssign('id_image_url', idImages ? idImages[0] : data.idImageUrl);
   maybeAssign('id_image_urls', idImages);
@@ -104,6 +107,7 @@ export const createCustomer = async (data: RtdbCustomerInput): Promise<string> =
     vehicleNumber: data.vehicleNumber ?? '',
     address: data.address ?? '',
     city: data.city ?? '',
+    amount: data.amount ?? '',
     idType: 'Aadhaar',
     idNumber: data.idNumber,
     idImageUrl: idImages[0] ?? data.idImageUrl ?? '',
@@ -321,6 +325,7 @@ export const fetchCustomerById = async (
   father_name?: string;
   address?: string;
   city?: string;
+  amount?: string;
   mobile: string;
   id_number?: string;
   id_type?: string;
@@ -334,12 +339,13 @@ export const fetchCustomerById = async (
   const snap = await get(ref(rtdb, `customers/${id}`));
   if (!snap.exists()) return null;
   const c = snap.val() as any;
+  const amount = c.amount ?? '';
   return {
     id,
     name: c.guestName || c.name || 'Guest',
     father_name: c.fatherName || c.father_name || '',
     address: c.address || '',
-    city: c.city || '',
+    amount,
     mobile: c.mobileNumber || c.phone || '',
     id_number: c.idNumber || c.id_number || '',
     id_type: c.idType || c.id_type || 'Aadhaar',
