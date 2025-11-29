@@ -63,7 +63,7 @@ const BookingDetailScreen = () => {
         <Text style={styles.sectionTitle}>Guest</Text>
         <InfoRow label="Name" value={booking.customer?.name || 'Guest'} />
         <InfoRow label="Mobile" value={booking.customer?.mobile || '-'} />
-        <InfoRow label="Amount" value={booking.customer?.city || '-'} />
+        <InfoRow label="Amount" value={booking.customer?.amount || booking.customer?.city || '-'} />
       </View>
 
       <View style={styles.card}>

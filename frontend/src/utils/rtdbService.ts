@@ -446,6 +446,7 @@ export type BookingDetail = {
     father_name?: string;
     address?: string;
     city?: string;
+    amount?: string;
   };
   room?: RtdbRoom;
 };
@@ -509,6 +510,7 @@ export const fetchBookingById = async (bookingId: string): Promise<BookingDetail
           father_name: customer.fatherName || customer.father_name || '',
           address: customer.address || '',
           city: customer.city || '',
+          amount: customer.amount || '',
         }
       : undefined,
   };
