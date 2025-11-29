@@ -192,24 +192,25 @@ const NewBookingScreen: React.FC = () => {
     return { start, end };
   };
 
-  // 🔥 LIVE PREDICTION GREY-OUT BASED ON CHECK-IN & CHECK-OUT
+  // 🔥 LIVE PREDICTION GREY-OUT BASED ON CHECK-IN & CHECK-OUT RANGE
   useEffect(() => {
-    if (!checkInDate || !checkOutDate) {
-      // Reset if no dates yet
+    const start = checkInDate || selectedDate || new Date();
+    const end = checkOutDate || checkInDate || selectedDate || new Date();
+    if (!start || !end) {
       setUnavailableRooms(new Set());
       return;
     }
-
-    const start = new Date(checkInDate);
-    const end = new Date(checkOutDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
+    const rangeStart = new Date(start);
+    const rangeEnd = new Date(end);
+    if (rangeEnd < rangeStart) rangeEnd.setTime(rangeStart.getTime());
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(23, 59, 59, 999);
 
     const bookingsRef = collection(db, 'bookings');
     const bookingsQuery = query(
       bookingsRef,
-      where('check_in', '<=', Timestamp.fromDate(end)),
-      where('check_out', '>=', Timestamp.fromDate(start))
+      where('check_in', '<=', Timestamp.fromDate(rangeEnd)),
+      where('check_out', '>=', Timestamp.fromDate(rangeStart))
     );
 
     const mergeFromRtdbBookings = async (existing: Set<number>) => {
@@ -228,7 +229,8 @@ const NewBookingScreen: React.FC = () => {
           );
           if (!bookingCheckIn || !bookingCheckOut) return;
           const overlaps =
-            bookingCheckIn.getTime() <= end.getTime() && bookingCheckOut.getTime() >= start.getTime();
+            bookingCheckIn.getTime() <= rangeEnd.getTime() &&
+            bookingCheckOut.getTime() >= rangeStart.getTime();
           if (overlaps) existing.add(Number(roomNo));
         });
       } catch (err) {
@@ -276,7 +278,7 @@ const NewBookingScreen: React.FC = () => {
     );
 
     return () => unsub();
-  }, [checkInDate, checkOutDate, rooms]);
+  }, [checkInDate, checkOutDate, selectedDate, rooms]);
 
   useEffect(() => {
     // Auto-adjust selected rooms if any become unavailable
@@ -765,11 +767,14 @@ const NewBookingScreen: React.FC = () => {
                     ]}
                     onPress={() => handleSelectRoom(room)}
                     disabled={isUnavailable}
-                  >
+                >
                     {isUnavailable && (
-                      <View style={styles.unavailableBadge}>
-                        <Text style={styles.unavailableBadgeText}>Booked</Text>
-                      </View>
+                      <>
+                        <View style={styles.unavailableStripe} />
+                        <View style={styles.unavailableBadge}>
+                          <Text style={styles.unavailableBadgeText}>Booked</Text>
+                        </View>
+                      </>
                     )}
 
                     <Text
@@ -949,6 +954,7 @@ const styles = StyleSheet.create({
   roomCardUnavailable: {
     backgroundColor: '#E5E7EB',
     borderColor: '#9CA3AF',
+    opacity: 0.95,
   },
   roomCardSelected: {
     borderColor: '#FBBF24',
@@ -973,11 +979,23 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: '#F97373',
+    zIndex: 2,
   },
   unavailableBadgeText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  unavailableStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: '#9CA3AF',
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
+    zIndex: 1,
   },
   roomType: {
     fontSize: 14,

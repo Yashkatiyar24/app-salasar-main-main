@@ -42,6 +42,11 @@ const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
       ? booking.room_numbers.join(', ')
       : booking.room?.room_number || 'N/A';
 
+  const checkoutValue =
+    booking.status?.toString().toUpperCase() === 'CHECKED_OUT' && booking.check_out_actual
+      ? booking.check_out_actual
+      : booking.check_out_expected;
+
   return (
     <TouchableOpacity style={styles.item} onPress={onPress}>
       <View style={styles.header}>
@@ -53,7 +58,7 @@ const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
       </View>
       <View style={styles.dates}>
         <Text style={styles.dateText}>Check-in: {formatDateTime(booking.check_in)}</Text>
-        <Text style={styles.dateText}>Check-out: {formatDateTime(booking.check_out_expected)}</Text>
+        <Text style={styles.dateText}>Check-out: {formatDateTime(checkoutValue)}</Text>
       </View>
     </TouchableOpacity>
   );
