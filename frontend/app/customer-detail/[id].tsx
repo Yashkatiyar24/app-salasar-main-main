@@ -97,7 +97,7 @@ const CustomerDetailScreen = () => {
         <InfoInput label="Members" value={customer.membersCount} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, membersCount: v })} />
         <InfoInput label="Vehicle Number" value={customer.vehicleNumber} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, vehicleNumber: v })} />
         <InfoInput label="ID Type" value={customer.id_type} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, id_type: v })} />
-        <InfoInput label="ID Number" value={customer.id_number} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, id_number: v })} />
+        <InfoInput label="ID Number" value={customer.id_number} editable={isAdmin && editing} onChange={(v) => setCustomer({ ...customer, id_number: v })} keyboardType="default" />
         {customer.idImageUrls && customer.idImageUrls.length > 0 ? (
           <View style={styles.imageWrapper}>
             <Text style={styles.imageLabel}>ID Images</Text>
@@ -138,11 +138,13 @@ const InfoInput = ({
   value,
   editable,
   onChange,
+  keyboardType,
 }: {
   label: string;
   value?: string | number;
   editable: boolean;
   onChange: (v: string) => void;
+  keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address';
 }) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
@@ -151,6 +153,7 @@ const InfoInput = ({
         style={styles.infoInput}
         value={value?.toString() || ''}
         onChangeText={onChange}
+        keyboardType={keyboardType || 'default'}
       />
     ) : (
       <Text style={styles.infoValue}>{value || '-'}</Text>

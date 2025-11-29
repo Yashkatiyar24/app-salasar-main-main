@@ -627,13 +627,13 @@ const NewBookingScreen: React.FC = () => {
 
           <Text style={styles.sectionTitle}>ID Proof</Text>
           <TextInput style={styles.input} value="Aadhaar" editable={false} />
-          <TextInput
-            style={styles.input}
+        <TextInput
+          style={styles.input}
           placeholder="ID Number *"
           placeholderTextColor={placeholderColor}
           value={idNumber}
           onChangeText={setIdNumber}
-          keyboardType="numeric"
+          keyboardType="default"
         />
           <View style={styles.inputRow}>
             <TextInput
