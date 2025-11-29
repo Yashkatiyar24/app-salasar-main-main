@@ -50,6 +50,10 @@ const BookingDetailScreen = () => {
   }
 
   const isActive = booking.status === 'BOOKED';
+  const roomsLabel =
+    booking.roomNumbers && booking.roomNumbers.length > 0
+      ? booking.roomNumbers.join(', ')
+      : booking.roomNo;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -64,7 +68,7 @@ const BookingDetailScreen = () => {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Room</Text>
-        <InfoRow label="Room No" value={booking.roomNo} />
+        <InfoRow label="Room No" value={roomsLabel} />
         <InfoRow label="Type" value={booking.room?.type || '-'} />
         <InfoRow
           label="Status"

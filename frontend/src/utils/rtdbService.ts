@@ -427,6 +427,7 @@ export type BookingDetail = {
   id: string;
   customerId: string;
   roomNo: string;
+  roomNumbers?: number[];
   status: string;
   checkInDate: string;
   checkOutDate: string;
@@ -445,15 +446,17 @@ export type BookingDetail = {
 
 export const fetchBookingById = async (bookingId: string): Promise<BookingDetail | null> => {
   const bookingRef = ref(rtdb, `bookings/${bookingId}`);
-  const [bookingSnap, customersSnap, roomsSnap] = await Promise.all([
+  const [bookingSnap, customersSnap, roomsSnap, bookingsSnap] = await Promise.all([
     get(bookingRef),
     get(ref(rtdb, 'customers')),
     get(ref(rtdb, 'rooms')),
+    get(ref(rtdb, 'bookings')),
   ]);
   if (!bookingSnap.exists()) return null;
   const bookingVal = bookingSnap.val() as any;
   const customersVal = customersSnap.val() || {};
   const roomsVal = roomsSnap.val() || {};
+  const allBookingsVal = bookingsSnap.val() || {};
 
   const roomEntry = findRoomEntryByRoomNo(roomsVal, bookingVal.roomNo);
   const roomKey = roomEntry ? roomEntry[0] : undefined;
@@ -463,10 +466,29 @@ export const fetchBookingById = async (bookingId: string): Promise<BookingDetail
 
   const customer = customersVal[bookingVal.customerId];
 
+  const roomNumbers = new Set<number>();
+  const selectedRoomField =
+    customer?.selectedRoom || customer?.selected_room || customer?.selectedRooms || bookingVal?.selectedRoom;
+  if (selectedRoomField && typeof selectedRoomField === 'string') {
+    selectedRoomField
+      .split(',')
+      .map((s: string) => Number(s.trim()))
+      .filter((n: number) => !Number.isNaN(n))
+      .forEach((n: number) => roomNumbers.add(n));
+  }
+  Object.values<any>(allBookingsVal).forEach((b: any) => {
+    if (b?.customerId !== bookingVal.customerId) return;
+    const status = normalizeBookingStatus(b?.status);
+    if (status === 'CHECKED_OUT') return;
+    const rn = Number(b?.roomNo ?? b?.room_no);
+    if (!Number.isNaN(rn)) roomNumbers.add(rn);
+  });
+
   return {
     id: bookingId,
     customerId: bookingVal.customerId,
     roomNo: bookingVal.roomNo,
+    roomNumbers: Array.from(roomNumbers.values()),
     status: normalizeBookingStatus(bookingVal.status),
     checkInDate: bookingVal.checkInDate,
     checkOutDate: bookingVal.checkOutDate || bookingVal.checkoutDate,

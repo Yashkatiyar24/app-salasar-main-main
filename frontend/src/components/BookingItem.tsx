@@ -14,12 +14,17 @@ const BookingItem: React.FC<BookingItemProps> = ({ booking, onPress }) => {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const roomLabel =
+    booking.room_numbers && booking.room_numbers.length > 0
+      ? booking.room_numbers.join(', ')
+      : booking.room?.room_number || 'N/A';
+
   return (
     <TouchableOpacity style={styles.item} onPress={onPress}>
       <View style={styles.header}>
         <View>
           <Text style={styles.guestName}>{booking.customer?.name || 'Unknown Guest'}</Text>
-          <Text style={styles.roomNumber}>Room: {booking.room?.room_number || 'N/A'}</Text>
+          <Text style={styles.roomNumber}>Room: {roomLabel}</Text>
         </View>
         <StatusBadge status={booking.status} small />
       </View>

@@ -61,7 +61,7 @@ const NewBookingScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showCheckInPicker, setShowCheckInPicker] = useState(false);
   const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<RtdbRoom | null>(null);
+  const [selectedRooms, setSelectedRooms] = useState<RtdbRoom[]>([]);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,7 +131,7 @@ const NewBookingScreen: React.FC = () => {
     setCheckInDate(null);
     setCheckOutDate(null);
     setSelectedDate(null);
-    setSelectedRoom(null);
+    setSelectedRooms([]);
   };
 
   useEffect(() => {
@@ -140,9 +140,11 @@ const NewBookingScreen: React.FC = () => {
       (liveRooms) => {
         const usable = buildAvailableList(liveRooms);
         setRooms(usable);
-        setSelectedRoom((current) => {
-          if (current && usable.find((r) => r.key === current.key)) return current;
-          return usable[0] ?? null;
+        setSelectedRooms((current) => {
+          const stillValid = current.filter((r) => usable.find((u) => u.key === r.key));
+          if (stillValid.length > 0) return stillValid;
+          const first = usable.find((r) => !isRoomUnavailable(r.room_no, r));
+          return first ? [first] : [];
         });
         setLoadingRooms(false);
       },
@@ -150,7 +152,11 @@ const NewBookingScreen: React.FC = () => {
         console.error('Error subscribing to rooms:', error);
         const availableFallback = fallbackRooms.filter((r) => r.is_available);
         setRooms(availableFallback);
-        setSelectedRoom((current) => current ?? availableFallback[0] ?? null);
+        setSelectedRooms((current) => {
+          const stillValid = current.filter((r) => availableFallback.find((u) => u.key === r.key));
+          if (stillValid.length > 0) return stillValid;
+          return availableFallback[0] ? [availableFallback[0]] : [];
+        });
         if (!roomsErrorShown) {
           const message =
             error && (error as any).code === 'PERMISSION_DENIED'
@@ -273,11 +279,12 @@ const NewBookingScreen: React.FC = () => {
   }, [checkInDate, checkOutDate, rooms]);
 
   useEffect(() => {
-    // Auto-adjust selected room if it becomes unavailable
-    setSelectedRoom((current) => {
-      if (current && !isRoomUnavailable(current.room_no, current)) return current;
-      const nextAvailable = rooms.find((room) => !isRoomUnavailable(room.room_no, room));
-      return nextAvailable ?? null;
+    // Auto-adjust selected rooms if any become unavailable
+    setSelectedRooms((current) => {
+      const valid = current.filter((room) => !isRoomUnavailable(room.room_no, room));
+      if (valid.length > 0) return valid;
+      const next = rooms.find((room) => !isRoomUnavailable(room.room_no, room));
+      return next ? [next] : [];
     });
   }, [rooms, unavailableRooms]);
 
@@ -410,13 +417,14 @@ const NewBookingScreen: React.FC = () => {
       Alert.alert('Missing Info', 'ID number is required');
       return false;
     }
-    if (!selectedRoom) {
-      Alert.alert('Missing Info', 'Please select an available room');
+    if (selectedRooms.length === 0) {
+      Alert.alert('Missing Info', 'Please select at least one available room');
       return false;
     }
     // Use unified availability check (RTDB + Firestore)
-    if (isRoomUnavailable(selectedRoom.room_no, selectedRoom)) {
-      Alert.alert('Room occupied', 'This room is already booked. Please pick another room.');
+    const invalid = selectedRooms.find((room) => isRoomUnavailable(room.room_no, room));
+    if (invalid) {
+      Alert.alert('Room occupied', `Room ${invalid.room_no} is already booked. Please pick another room.`);
       return false;
     }
 
@@ -436,7 +444,7 @@ const NewBookingScreen: React.FC = () => {
   };
 
   const handleCreateBooking = async () => {
-    if (!validateForm() || !selectedRoom || !checkInDate || !checkOutDate) return;
+    if (!validateForm() || selectedRooms.length === 0 || !checkInDate || !checkOutDate) return;
 
     const members = Number.parseInt(membersCount, 10) || 0;
 
@@ -453,17 +461,19 @@ const NewBookingScreen: React.FC = () => {
         vehicleNumber: vehicleNumber.trim() || undefined,
         checkInDate: checkInDate.toISOString(),
         checkOutDate: checkOutDate.toISOString(),
-        selectedRoom: selectedRoom.room_no.toString(),
+        selectedRoom: selectedRooms.map((r) => r.room_no).join(','),
         idImageUrls,
         idImageUrl: idImageUrls[0] ?? idImageUrl ?? undefined,
       });
 
-      const bookingId = await createBooking(
-        customerId,
-        selectedRoom.room_no.toString(),
-        checkInDate.toISOString(),
-        checkOutDate.toISOString()
-      );
+      for (const room of selectedRooms) {
+        await createBooking(
+          customerId,
+          room.room_no.toString(),
+          checkInDate.toISOString(),
+          checkOutDate.toISOString()
+        );
+      }
 
       Alert.alert('Success', 'Booking created and saved successfully');
       resetForm();
@@ -543,7 +553,13 @@ const NewBookingScreen: React.FC = () => {
 
   const handleSelectRoom = (room: RtdbRoom) => {
     if (isRoomUnavailable(room.room_no, room)) return;
-    setSelectedRoom(room);
+    setSelectedRooms((current) => {
+      const exists = current.find((r) => r.key === room.key);
+      if (exists) {
+        return current.filter((r) => r.key !== room.key);
+      }
+      return [...current, room];
+    });
   };
 
   return (
@@ -735,39 +751,41 @@ const NewBookingScreen: React.FC = () => {
             <Text style={styles.noRoomsText}>No rooms available right now.</Text>
           ) : (
             <View style={styles.roomsGrid}>
-  {rooms.map((room) => {
-    const isUnavailable = isRoomUnavailable(room.room_no, room);
-    const isSelected = !isUnavailable && selectedRoom?.key === room.key;
+              {rooms.map((room) => {
+                const isUnavailable = isRoomUnavailable(room.room_no, room);
+                const isSelected =
+                  !isUnavailable && selectedRooms.some((selected) => selected.key === room.key);
 
-    return (
-      <TouchableOpacity
-        key={room.key}
-        style={[
-          styles.roomCard,
-          isUnavailable && styles.roomCardUnavailable,
-          isSelected && styles.roomCardSelected,
-        ]}
-        onPress={() => handleSelectRoom(room)}
-        disabled={isUnavailable}
-      >
-        {isUnavailable && (
-          <View style={styles.unavailableBadge}>
-            <Text style={styles.unavailableBadgeText}>Booked</Text>
-          </View>
-        )}
+                return (
+                  <TouchableOpacity
+                    key={room.key}
+                    style={[
+                      styles.roomCard,
+                      isUnavailable && styles.roomCardUnavailable,
+                      isSelected && styles.roomCardSelected,
+                    ]}
+                    onPress={() => handleSelectRoom(room)}
+                    disabled={isUnavailable}
+                  >
+                    {isUnavailable && (
+                      <View style={styles.unavailableBadge}>
+                        <Text style={styles.unavailableBadgeText}>Booked</Text>
+                      </View>
+                    )}
 
-        <Text
-          style={[
-            styles.roomNumber,
-            isUnavailable && styles.roomTextUnavailable,
-          ]}
-        >
-          Room {room.room_no} – {room.type} – {room.beds} beds
-        </Text>
-      </TouchableOpacity>
-    );
-  })}
-</View>
+                    <Text
+                      style={[
+                        styles.roomNumber,
+                        isUnavailable && styles.roomTextUnavailable,
+                      ]}
+                    >
+                      Room {room.room_no} – {room.type} – {room.beds} bed
+                      {room.beds === 1 ? '' : 's'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           )}
 
           {/* Date pickers — use fallback value when state is null */}

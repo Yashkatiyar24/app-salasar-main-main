@@ -90,9 +90,23 @@ const BookingsScreen = () => {
       });
 
       const sorted = mapped.sort((a, b) => (a.created_at > b.created_at ? -1 : 1));
+      // Group by customer so multiple rooms booked by same guest appear in one entry
+      const groupedMap = new Map<string, Booking & { room_numbers: string[] }>();
+      for (const b of sorted) {
+        const key = b.customer_id || b.id;
+        const roomNo = b.room?.room_number || b.room_id?.toString() || '';
+        const existing = groupedMap.get(key);
+        if (existing) {
+          if (roomNo && !existing.room_numbers.includes(roomNo)) existing.room_numbers.push(roomNo);
+          // keep the most recent entry (sorted already), so no other fields change
+        } else {
+          groupedMap.set(key, { ...b, room_numbers: roomNo ? [roomNo] : [] });
+        }
+      }
+      const grouped = Array.from(groupedMap.values());
 
-      setBookings(sorted);
-      setFilteredBookings(sorted);
+      setBookings(grouped);
+      setFilteredBookings(grouped);
     } catch (error) {
       console.error('Error fetching bookings:', error);
       alert('Failed to load bookings');
