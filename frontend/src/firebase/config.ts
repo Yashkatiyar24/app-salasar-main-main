@@ -43,9 +43,11 @@ export const rtdb = getDatabase(app);
 // Initialize Analytics on web (try-catch because Analytics isn't available in native runtimes)
 let analytics: any = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { getAnalytics } = require('firebase/analytics');
-  analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getAnalytics } = require('firebase/analytics');
+    analytics = getAnalytics(app);
+  }
 } catch (e) {
   // Not critical — analytics may not be supported in the current runtime.
 }
