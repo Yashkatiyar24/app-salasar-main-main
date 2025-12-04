@@ -11,7 +11,7 @@ const firebaseConfig = {
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "salasar-2d54a.firebaseapp.com",
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "salasar-2d54a",
   storageBucket:
-    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "salasar-2d54a.firebasestorage.app",
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "salasar-2d54a.appspot.com",
   messagingSenderId:
     process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "1047052211844",
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "1:1047052211844:web:5c43a4a59e0fc848be14d1",
