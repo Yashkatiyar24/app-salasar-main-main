@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,   // 👈 change this
+    "newArchEnabled": true,   
 
     "ios": {
       "supportsTablet": true
