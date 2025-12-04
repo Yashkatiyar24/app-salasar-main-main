@@ -14,7 +14,6 @@
     "production": {
       "autoIncrement": true,
       "node": "20.11.1",
-      "installCommand": "yarn install --non-interactive",
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDvTSUPaEiI2gVs9Q_RRJ9Wd1zFCzZgrbE",
         "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "salasar-2d54a.firebaseapp.com",
