@@ -13,6 +13,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "node": "20.19.4",
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDvTSUPaEiI2gVs9Q_RRJ9Wd1zFCzZgrbE",
