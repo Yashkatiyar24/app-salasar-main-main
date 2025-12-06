@@ -9,6 +9,7 @@ import { doc, getDoc, getDocFromCache } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { UserProfile } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const elevateIfSarita = (user: User | null, profile: UserProfile | null): UserProfile | null => {
   const name = (profile?.full_name || user?.displayName || '').trim().toLowerCase();
@@ -111,12 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       
       if (firebaseUser) {
+        await SecureStore.setItemAsync('auth_user_uid', firebaseUser.uid);
         await fetchUserProfile(firebaseUser.uid);
         // fallback: if no profile or needs elevation
         setProfile((prev) => elevateIfSarita(firebaseUser, prev) || prev);
       } else {
         setProfile(null);
         await AsyncStorage.removeItem('userProfile');
+        await SecureStore.deleteItemAsync('auth_user_uid');
       }
       
       setLoading(false);
@@ -152,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setProfile(null);
       await AsyncStorage.removeItem('userProfile');
+      await SecureStore.deleteItemAsync('auth_user_uid');
     } catch (error: any) {
       console.error('Sign out error:', error);
       throw new Error(error.message || 'Failed to sign out');
@@ -179,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(fakeUser);
     setProfile(fakeProfile);
     await AsyncStorage.setItem('userProfile', JSON.stringify(fakeProfile));
+    await SecureStore.setItemAsync('auth_user_uid', fakeUser.uid);
     setLoading(false);
   };
 
