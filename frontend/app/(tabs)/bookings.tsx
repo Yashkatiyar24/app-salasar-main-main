@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { get, ref } from 'firebase/database';
-import { rtdb } from '@/lib/firebase';
+import { rtdb } from '../../src/firebase/firebase';
 import { Booking } from '../../src/types';
 import BookingItem from '../../src/components/BookingItem';
 import LoadingSpinner from '../../src/components/LoadingSpinner';

@@ -1,4 +1,4 @@
-import { rtdb } from '@/lib/firebase';
+import { rtdb } from '../firebase/firebase';
 import {
   ref,
   push,

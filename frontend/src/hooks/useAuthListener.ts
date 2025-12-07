@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import * as SecureStore from 'expo-secure-store';
-import { auth } from '@/lib/firebase';
+import { auth } from '../firebase/firebase';
 
 const AUTH_UID_KEY = 'auth_user_uid';
 

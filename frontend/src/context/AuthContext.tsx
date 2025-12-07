@@ -1,15 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import {
-  User,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-} from 'firebase/auth';
+import { User, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, getDocFromCache } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db } from '../firebase/firebase';
 import { UserProfile } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { ensureSessionPersistence, loginWithEmail } from '../lib/auth';
 
 const USER_STORAGE_KEY = 'auth_user';
 const PROFILE_STORAGE_KEY = 'userProfile';
@@ -208,7 +204,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await ensureSessionPersistence();
+      const userCredential = await loginWithEmail(email, password);
       setUser(userCredential.user);
       await cacheUser(userCredential.user);
       await SecureStore.setItemAsync(SECURE_UID_KEY, userCredential.user.uid);
