@@ -52,9 +52,9 @@ const rawRooms: SeedRoom[] = [
   { room_no: 211, beds: 4, type: 'Non AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
 
   { room_no: 301, beds: 4, type: 'Non AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
-  { room_no: 302, beds: 0, type: 'Non AC', ac_make: 'Small Hall', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 302, beds: 0, type: 'Non AC Small Hall', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 303, beds: 4, type: 'AC', ac_make: 'LLOYD (NEW)', remarks: '', is_available: true, current_booking_id: null },
-  { room_no: 304, beds: 4, type: 'AC', ac_make: 'IFB, LLOYD', remarks: '', is_available: true, current_booking_id: null },
+  { room_no: 304, beds: 0, type: 'AC Big Hall', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 305, beds: 4, type: 'Non AC', ac_make: '', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 306, beds: 6, type: 'AC', ac_make: 'LLOYD', remarks: '', is_available: true, current_booking_id: null },
   { room_no: 307, beds: 4, type: 'AC', ac_make: 'LLOYD (NEW)', remarks: '', is_available: true, current_booking_id: null },
@@ -63,11 +63,12 @@ const rawRooms: SeedRoom[] = [
 export const defaultRoomSeeds = rawRooms
   .map((room) => {
     const status: RoomStatus = room.is_available ? DEFAULT_ROOM_STATUS : 'OCCUPIED';
+    const capacity = Number.isFinite(room.beds) ? room.beds : 1;
 
     return {
       room_number: room.room_no.toString(),
       type: room.type,
-      capacity: room.beds > 0 ? room.beds : 1,
+      capacity,
       price_per_night: 0,
       status,
       ac_make: room.ac_make,

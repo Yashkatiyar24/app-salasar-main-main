@@ -25,6 +25,25 @@ export type RtdbRoom = {
   current_booking_id?: string | null;
 };
 
+// UI-only overrides for room labels/capacity without mutating backend data.
+const ROOM_UI_LABEL_OVERRIDES: Record<
+  number,
+  {
+    type?: string;
+    beds?: number;
+    ac_make?: string;
+    remarks?: string;
+  }
+> = {
+  7: { type: 'AC', beds: 4 },
+  8: { type: 'AC', beds: 3 },
+  9: { type: 'AC', beds: 2 },
+  10: { type: 'AC', beds: 3 },
+  103: { type: 'AC', beds: 3 },
+  302: { type: 'Non AC Small Hall', beds: 0 },
+  304: { type: 'AC Big Hall', beds: 0 },
+};
+
 export type RtdbCustomerInput = {
   guestName: string;
   fatherName?: string;
@@ -722,13 +741,19 @@ const mapRoomsSnapshot = (snap: DataSnapshot): RtdbRoom[] => {
   return Object.entries(val).map(([key, value]) => {
     const room = value as any;
     const { isAvailable, normalizedStatus } = deriveRoomAvailability(room);
+    const roomNo = Number(room.room_no) || Number(key) || 0;
+    const override = ROOM_UI_LABEL_OVERRIDES[roomNo];
+    const rawBeds = override?.beds ?? room.beds;
+    const parsedBeds = Number(rawBeds);
+    const beds = Number.isFinite(parsedBeds) ? parsedBeds : 1;
+
     return {
       key,
-      room_no: Number(room.room_no) || Number(key) || 0,
-      beds: Number(room.beds) || 1,
-      type: room.type || 'Standard',
-      ac_make: room.ac_make,
-      remarks: room.remarks,
+      room_no: roomNo,
+      beds,
+      type: override?.type || room.type || 'Standard',
+      ac_make: override?.ac_make ?? room.ac_make,
+      remarks: override?.remarks ?? room.remarks,
       status: normalizedStatus,
       is_available: isAvailable,
       current_booking_id: room.current_booking_id ?? null,
