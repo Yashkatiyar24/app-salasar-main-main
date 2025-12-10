@@ -7,9 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
-
     "newArchEnabled": false,
-
     "ios": {
       "supportsTablet": true
     },
@@ -32,7 +30,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash.png",
+          "image": "./assets/images/app-image.png",
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }
