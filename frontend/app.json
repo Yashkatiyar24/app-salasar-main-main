@@ -8,23 +8,19 @@
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
 
-    // 🔴 Turn New Architecture OFF
     "newArchEnabled": false,
 
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.your.package",
+      "package": "com.yashkatiyar24.salasarstaymanager",
       "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
-
-      // (extra safety – also disable here)
-      "newArchEnabled": false
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "bundler": "metro",
