@@ -1,16 +1,19 @@
 {
   "expo": {
     "name": "Salasar Stay Manager",
-    "slug": "salasar-stay-manager",
+    "slug": "salasar",
+    "owner": "yashkatiyar2405s-organization",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
       "package": "com.yashkatiyar24.salasarstaymanager",
       "versionCode": 2,
@@ -20,11 +23,13 @@
       },
       "edgeToEdgeEnabled": true
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
@@ -36,10 +41,11 @@
         }
       ]
     ],
+
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7674587b-5c80-4b76-af98-6620d99b88f3"
+        "projectId": "f6863615-f950-45cd-88a1-39bb09ee7807"
       }
     }
   }
