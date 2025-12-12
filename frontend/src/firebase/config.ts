@@ -9,15 +9,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const firebaseConfig = {
   apiKey:
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY ??
-    "AIzaSyAJeaxnuunfjIW8AqR8HiaE_LOmKyTYHTs",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "salasar-hotel.firebaseapp.com",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "salasar-hotel",
+    "AIzaSyDvTSUPaEiI2gVs9Q_RRJ9Wd1zFCzZgrbE",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "salasar-2d54a.firebaseapp.com",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "salasar-2d54a",
   storageBucket:
-    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "salasar-hotel.firebasestorage.app",
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "salasar-2d54a.firebasestorage.app",
   messagingSenderId:
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "474921163584",
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "1:474921163584:web:d3c8eaf72bccd293dc38a5",
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "G-ELE15YL9QZ",
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "1047052211844",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "1:1047052211844:web:5c43a4a59e0fc848be14d1",
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "G-4E04XNFWF9",
   // Realtime Database URL
   // Prefer env override, but default to the project's RTDB endpoint so RTDB works out of the box.
   databaseURL:
