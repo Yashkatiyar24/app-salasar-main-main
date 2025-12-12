@@ -14,17 +14,17 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       },
       "node": "20.19.4",
       "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDvTSUPaEiI2gVs9Q_RRJ9Wd1zFCzZgrbE",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "salasar-2d54a.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "salasar-2d54a",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "salasar-2d54a.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "1047052211844",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:1047052211844:web:5c43a4a59e0fc848be14d1",
-        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-4E04XNFWF9",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAJeaxnuunfjIW8AqR8HiaE_LOmKyTYHTs",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "salasar-hotel.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "salasar-hotel",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "salasar-hotel.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "474921163584",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:474921163584:web:d3c8eaf72bccd293dc38a5",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-ELE15YL9QZ",
         "EXPO_PUBLIC_FIREBASE_DATABASE_URL": "https://salasar-2d54a-default-rtdb.firebaseio.com"
       }
     }

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, Persistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getDatabase } from "firebase/database";
@@ -37,8 +37,42 @@ export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // Export commonly used SDK services so other modules (AuthContext, etc.) can import them.
 export const auth = getAuth(app);
 
-// Firebase Auth automatically persists in React Native via AsyncStorage
-// The SDK handles this internally, no additional setup needed
+// Custom persistence implementation using AsyncStorage for React Native
+const reactNativeLocalPersistence: Persistence = {
+  type: 'LOCAL',
+};
+
+// Set persistence for React Native using AsyncStorage
+// Note: Firebase will use IndexedDB/localStorage which Expo polyfills with AsyncStorage
+setPersistence(auth, reactNativeLocalPersistence).catch((error) => {
+  console.error('Error setting auth persistence:', error);
+});
+
+// Additionally, ensure auth state persists by storing user token in AsyncStorage
+// Only run in React Native environment (not during SSR or build)
+if (typeof window === 'undefined' || typeof navigator !== 'undefined') {
+  auth.onAuthStateChanged(async (user) => {
+    try {
+      if (user) {
+        const token = await user.getIdToken();
+        await AsyncStorage.setItem(
+          'firebase:authUser',
+          JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            token: token,
+          })
+        );
+      } else {
+        await AsyncStorage.removeItem('firebase:authUser');
+      }
+    } catch (error) {
+      console.error('Error storing auth state:', error);
+    }
+  });
+}
+
+// Firestore / Storage / RTDB
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 // Realtime Database (optional)
