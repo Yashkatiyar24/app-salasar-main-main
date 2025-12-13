@@ -11,10 +11,17 @@
     "preview": {
       "distribution": "internal"
     },
+    "apkTest": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "node": "20.19.4"
+    },
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "apK"
+        "buildType": "app-bundle"
       },
       "node": "20.19.4"
     }
