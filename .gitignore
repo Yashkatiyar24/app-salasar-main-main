@@ -1,82 +1,118 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# IDE and editors
+# =========================================================
+# IDEs & Editors
+# =========================================================
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# =========================================================
+# Environment Variables (DO NOT COMMIT)
+# =========================================================
 .env
+.env.*
+frontend/.env*
+backend/.env*
 
-# Dependencies
-node_modules/
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# Testing
-/coverage
-
-# Next.js
-/.next/
-/out/
-next-env.d.ts
-*.tsbuildinfo
-
-# Production builds
-/build
-dist/
-dist
-
-# Environment files (comprehensive coverage)
-
+# =========================================================
+# Secrets & Credentials
+# =========================================================
 *token.json*
 *credentials.json*
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
 
-# Logs and debug files
+# =========================================================
+# Node / JavaScript
+# =========================================================
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-dump.rdb
+package-lock.json
+yarn.lock
 
-# System files
-.DS_Store
-*.pem
+# =========================================================
+# Expo / React Native
+# =========================================================
+.expo/
+.expo-shared/
+expo-dev.log
+.metro-cache/
+android-sdk/
+android/app/build/
+ios/build/
 
+# =========================================================
+# Next.js / Web
+# =========================================================
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# =========================================================
 # Python
+# =========================================================
 __pycache__/
-*pyc*
+*.pyc
+*.pyo
+*.pyd
 venv/
 .venv/
+.env.python
 
-# Development tools
-chainlit.md
-.chainlit
-.ipynb_checkpoints/
-.ac
+# =========================================================
+# Testing / Coverage
+# =========================================================
+coverage/
+test-results/
+playwright-report/
 
-# Deployment
-.vercel
+# =========================================================
+# Logs / Runtime
+# =========================================================
+logs/
+*.log
+dump.rdb
 
-# Data and databases
-agenthub/agents/youtube/db
+# =========================================================
+# System Files
+# =========================================================
+.DS_Store
+Thumbs.db
 
-# Archive files and large assets
-**/*.zip
-**/*.tar.gz
-**/*.tar
-**/*.tgz
-*.pack
-*.deb
-*.dylib
+# =========================================================
+# Deployment Platforms
+# =========================================================
+.vercel/
+.netlify/
+.firebase/
 
-# Build caches
+# =========================================================
+# Databases / Local Data
+# =========================================================
+*.sqlite
+*.db
+*.sqlite3
+
+# =========================================================
+# Archives & Large Files
+# =========================================================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+
+# =========================================================
+# Misc
+# =========================================================
 .cache/
-.metro-cache/
-
-# Mobile development
-android-sdk/
+tmp/
+temp/
