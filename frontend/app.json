@@ -15,7 +15,7 @@
     },
 
     "android": {
-      "package": "com.yashkatiyar24.salasarstaymanager",
+      "package": "com.salasar.staymanager",
       "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
