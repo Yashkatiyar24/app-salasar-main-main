@@ -16,21 +16,30 @@
       "android": {
         "buildType": "apk"
       },
-      "node": "20.19.4"
+      "node": "20.19.4",
+      "env": {
+        "EXPO_NEW_ARCH_ENABLED": "1"
+      }
     },
     "apkRelease": {
       "distribution": "store",
       "android": {
         "buildType": "apk"
       },
-      "node": "20.19.4"
+      "node": "20.19.4",
+      "env": {
+        "EXPO_NEW_ARCH_ENABLED": "1"
+      }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },
-      "node": "20.19.4"
+      "node": "20.19.4",
+      "env": {
+        "EXPO_NEW_ARCH_ENABLED": "1"
+      }
     }
   },
   "submit": {
